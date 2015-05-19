@@ -8,7 +8,7 @@ FileLogger =
     log(data, args)
 
 log = (data, args) ->
-  filename = 'log' + Dates.toIdentifier(moment()) + '.json'
+  filename = 'log-' + Dates.toIdentifier(moment()) + '.json'
   strData = if Types.isString(data) then data else JSON.stringify(data)
   filePath = FileUtils.writeToTempFile(filename, strData)
   Logger.info('Wrote log to', filePath)
