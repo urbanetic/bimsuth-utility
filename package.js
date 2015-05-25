@@ -27,10 +27,16 @@ Package.onUse(function (api) {
   api.export([
     'FileLogger'
   ], 'server');
+  api.export([
+    'TaskScheduler'
+  ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
     'src/FileLogger.coffee'
   ], 'server');
+  api.addFiles([
+    'src/TaskScheduler.coffee'
+  ], ['client', 'server']);
 });
