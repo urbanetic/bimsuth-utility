@@ -1,5 +1,3 @@
-bindMeteor = Meteor.bindEnvironment.bind(Meteor)
-
 class TaskScheduler
 
   constructor: (options) ->
@@ -26,10 +24,10 @@ class TaskScheduler
       @pauseDf = null
     runDuration = @options.runDuration
     Logger.debug('Task scheduler running for ' + runDuration + 'ms...')
-    @waitHandle = setTimeout (bindMeteor => @_wait()), @options.runDuration
+    @waitHandle = setTimeout (Meteor.bindEnvironment => @_wait()), @options.runDuration
 
     @status = 'running'
-    runNext = bindMeteor =>
+    runNext = Meteor.bindEnvironment =>
       if @bufferQueue.length == 0
         @runDf.resolve()
         @reset()
