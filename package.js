@@ -28,7 +28,7 @@ Package.onUse(function (api) {
     'FileLogger'
   ], 'server');
   api.export([
-    'TaskScheduler'
+    'TaskRunner'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -37,6 +37,6 @@ Package.onUse(function (api) {
     'src/FileLogger.coffee'
   ], 'server');
   api.addFiles([
-    'src/TaskScheduler.coffee'
+    'src/TaskRunner.coffee'
   ], ['client', 'server']);
 });

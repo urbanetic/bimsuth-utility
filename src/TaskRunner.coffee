@@ -1,4 +1,4 @@
-class TaskScheduler
+class TaskRunner
 
   constructor: (options) ->
     @options = Setter.merge({
