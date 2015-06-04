@@ -32,9 +32,13 @@ class TaskRunner
         return
       callback = @bufferQueue.shift()
       @runQueue.add(callback).fin(runNext)
+    
+    # Running on an empty queue will reset the promise so we need to store a refernece to the
+    # promise in case it's removed.
+    promise = @runDf.promise
+    if @bufferQueue.length == 0 then Logger.warn('No tasks added to runner - aborting')
     runNext()
-
-    @runDf.promise
+    promise
 
   _deferWait: ->
     runDuration = @options.runDuration
@@ -76,3 +80,4 @@ class TaskRunner
         df.reject('Task runner reset')
       @[name] = null
     clearTimeout(@waitHandle)
+    Logger.debug('Task runner reset')

@@ -186,7 +186,7 @@ EntityImporter =
               elevation = popParam(c3mlProps, ElevationParamIds)
               elevation ?= c3ml.altitude
               geomDfMap[c3mlId].then Meteor.bindEnvironment (geomArgs) =>
-                if geomArgs then geomArgs = @_mapGeometry(geomArgs) ? geomArgs
+                if geomArgs then geomArgs = @_mapGeometry(geomArgs, c3ml) ? geomArgs
 
                 # Geometry may be empty
                 space = null

@@ -2,6 +2,7 @@ EntityUtils =
 
   _footprintProperty: 'space.geom_2d'
   _meshProperty: 'space.geom_3d'
+  displayModeSessionVariable: 'entityDisplayMode'
 
   toGeoEntityArgs: (id, args) ->
     df = Q.defer()
