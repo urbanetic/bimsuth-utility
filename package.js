@@ -2,7 +2,7 @@
 Package.describe({
   name: 'urbanetic:bismuth-utility',
   version: '0.1.0',
-  summary: 'A set of utility modules used in Bismuth apps.',
+  summary: 'A set of utilities for working with GIS apps.',
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });
 
@@ -12,8 +12,12 @@ Package.onUse(function (api) {
     'coffeescript',
     'underscore',
     'aramk:q@1.0.1_1',
-    'aramk:utility@0.8.6'
+    'aramk:utility@0.8.6',
+    'urbanetic:atlas-util@0.3.0'
   ], ['client', 'server']);
+  api.use([
+    'urbanetic:bismuth-schema@0.1.0'
+  ], ['client', 'server'], {weak: true});
   api.use([
     'jquery',
     'less',
@@ -28,7 +32,9 @@ Package.onUse(function (api) {
     'FileLogger'
   ], 'server');
   api.export([
-    'TaskRunner'
+    'TaskRunner',
+    'EntityImporter',
+    'EntityUtils'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -37,6 +43,8 @@ Package.onUse(function (api) {
     'src/FileLogger.coffee'
   ], 'server');
   api.addFiles([
-    'src/TaskRunner.coffee'
+    'src/TaskRunner.coffee',
+    'src/EntityImporter.coffee',
+    'src/EntityUtils.coffee'
   ], ['client', 'server']);
 });
