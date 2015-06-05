@@ -58,7 +58,7 @@ EntityUtils =
 
   _getGeometryFromFile: (id, paramId) ->
     entity = Entities.findOne(id)
-    value = SchemaUtils.getParameterValue(entity, 'space.' + paramId)
+    value = SchemaUtils.getParameterValue(entity, paramId)
     unless value then return Q.resolve(null)
     # Attempt to parse the value as JSON. If it fails, treat it as a file ID.
     try
@@ -132,7 +132,7 @@ EntityUtils =
     df.promise.fin => @decrementRenderCount()
     model = Entities.findOne(id)
     geom_2d = @_getFootprint(model)
-    geom_3d = @_getFootprint(model)
+    geom_3d = @_getMesh(model)
     isCollection = Entities.getChildren(id).count() > 0
 
     unless geom_2d || geom_3d || isCollection
@@ -528,9 +528,9 @@ WKT.getWKT Meteor.bindEnvironment (wkt) ->
 
     getDisplayMode: (id) ->
       formType2d = @getFormType2d(id)
-      if formType2d != 'polygon'
+      if formType2d? && formType2d != 'polygon'
         # When rendering lines and points, ensure the display mode is consistent. With polygons,
-        # we only enable them if 
+        # they are only enabled if the display mode session variable specifies it.
         formType2d
       else if Meteor.isClient
         Session.get(@displayModeSessionVariable)
