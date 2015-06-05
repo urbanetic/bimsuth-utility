@@ -36,8 +36,7 @@ EntityUtils =
         height = space.height
         if height?
           args.height = height
-        result = converter.toGeoEntityArgs(args)
-        df.resolve(result)
+        df.resolve converter.toGeoEntityArgs(args)
       df.reject
     )
     df.promise
@@ -451,20 +450,12 @@ EntityUtils =
       entitiesJson.push(json)
     
     df = Q.defer()
-    if Entities.findByProjectAndScenario?
-      entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
-    else
-      entities = Entities.findByProject(projectId).fetch()
-    existingEntities = {}
-    ids = _.map entities, (entity) -> entity._id
-    if Meteor.isServer
-      # Unrender all entities when on the server to prevent using old rendered data.
-      unrenderPromises = _.map ids, (id) => @unrender(id)
-    else
-      unrenderPromises = []
+    entities = @_getEntitiesForJson(args)
+    ids = args.ids = _.map entities, (entity) -> entity._id
+    unrenderPromises = @_unrenderEntitiesBeforeJson(ids: ids)
     Q.all(unrenderPromises).then Meteor.bindEnvironment =>
-      renderPromise = @_renderBulk({ids: ids, projectId: projectId})
-      renderPromise.then -> 
+      renderPromise = @_renderEntitiesBeforeJson(args)
+      renderPromise.then ->
         geoEntities = _.map ids, (id) -> AtlasManager.getEntity(id)
         _.each geoEntities, (entity) ->
           addEntity(entity)
@@ -475,6 +466,22 @@ EntityUtils =
       renderPromise.fin Meteor.bindEnvironment =>
         if Meteor.isServer then _.each ids, (id) => @unrender(id)
     df.promise
+
+  _getEntitiesForJson: (args) ->
+    if Entities.findByProjectAndScenario?
+      entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
+    else
+      entities = Entities.findByProject(projectId).fetch()
+
+  _renderEntitiesBeforeJson: (args) -> @_renderBulk(args)
+
+  _unrenderEntitiesBeforeJson: (args) ->
+    if Meteor.isServer
+      # Unrender all entities when on the server to prevent using old rendered data.
+      # unrenderPromises = _.map ids, (id) => @unrender(id)
+      unrenderPromises = _.map ids, (id) => @unrender(id)
+    else
+      unrenderPromises = []
 
   _getProjectAndScenarioArgs: (args) ->
     args ?= {}
