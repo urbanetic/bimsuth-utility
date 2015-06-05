@@ -439,21 +439,17 @@ EntityUtils =
     scenarioId = args.scenarioId
     entitiesJson = []
     jsonIds = []
+
     addEntity = (entity) ->
       id = entity.getId()
       return if jsonIds[id]
       json = jsonIds[id] = entity.toJson()
       entitiesJson.push(json)
     
-    # renderedIds = []
-    # promises = []
     df = Q.defer()
-
     entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
     existingEntities = {}
     ids = _.map entities, (entity) -> entity._id
-      # AtlasManager
-      # existingEntities[]
     if Meteor.isServer
       # Unrender all entities when on the server to prevent using old rendered data.
       unrenderPromises = _.map ids, (id) => @unrender(id)
@@ -469,31 +465,9 @@ EntityUtils =
         _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
         df.resolve(c3mls: entitiesJson)
       # Unrender all entities when on the server to prevent using old rendered data.
-      renderPromise.fin Meteor.bindEnvironment => if Meteor.isServer then _.each ids, (id) => @unrender(id)
+      renderPromise.fin Meteor.bindEnvironment =>
+        if Meteor.isServer then _.each ids, (id) => @unrender(id)
     df.promise
-
-    # entities = _.filter entities, (entity) -> !entity.parent
-    # _.each entities, (entity) =>
-    #   id = entity._id
-    #   entityPromises = []
-    #   if Meteor.isServer
-    #     entityPromises.push @unrender(id)
-    #   entityPromises.push @render(id, args)
-    #   promises.push Q.all(entityPromises).then (result) ->
-    #     geoEntity = result[1]
-    #     return unless geoEntity
-    #     addEntity(geoEntity)
-    #     _.each geoEntity.getRecursiveChildren(), (childEntity) -> addEntity(childEntity)
-    # promise = Q.all(promises)
-    
-    # promise = df.promise
-    # promise.then ->
-    #   _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
-    #   {c3mls: entitiesJson}
-    # promise.fin =>
-    #   if Meteor.isServer
-    #     _.each renderedIds, (id) => @unrender(id)
-      # Remove all rendered entities so they aren't cached on the next request.
 
   _getProjectAndScenarioArgs: (args) ->
     args ?= {}
