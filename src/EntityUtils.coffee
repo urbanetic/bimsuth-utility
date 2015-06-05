@@ -6,20 +6,19 @@ EntityUtils =
 
   toGeoEntityArgs: (id, args) ->
     df = Q.defer()
-    model = Entities.findOne(id)
-    typeId = SchemaUtils.getParameterValue(model, 'general.type')
+    entity = @_getModel(id)
+    typeId = SchemaUtils.getParameterValue(entity, 'general.type')
     type = Typologies.findOne(typeId)
     typeFillColor = type && SchemaUtils.getParameterValue(type, 'style.fill_color')
     typeBorderColor = type && SchemaUtils.getParameterValue(type, 'style.border_color')
     AtlasConverter.getInstance().then(
       Meteor.bindEnvironment (converter) =>
-        style = model.parameters.style
+        style = entity.parameters.style
         fill_color = style?.fill_color ? typeFillColor ? '#eee'
         border_color = style?.border_color ? typeBorderColor
         if fill_color and !border_color
           border_color = Colors.darken(fill_color)
-        space = model.parameters.space ? {}
-        entity = Entities.findOne(id)
+        space = entity.parameters.space ? {}
         geom_2d = @_getFootprint(entity)
         unless geom_2d
           geom_2d = null
@@ -44,7 +43,7 @@ EntityUtils =
     df.promise
 
   toC3mlArgs: (id) ->
-    entity = Entities.findOne(id)
+    entity = @_getModel(id)
     args = {}
     elevation = SchemaUtils.getParameterValue(entity, 'space.elevation')
     height = SchemaUtils.getParameterValue(entity, 'space.height')
@@ -57,7 +56,7 @@ EntityUtils =
     args
 
   _getGeometryFromFile: (id, paramId) ->
-    entity = Entities.findOne(id)
+    entity = @_getModel(id)
     value = SchemaUtils.getParameterValue(entity, paramId)
     unless value then return Q.resolve(null)
     # Attempt to parse the value as JSON. If it fails, treat it as a file ID.
@@ -78,7 +77,7 @@ EntityUtils =
     df.promise
 
   _render2dGeometry: (id) ->
-    entity = Entities.findOne(id)
+    entity = @_getModel(id)
     footprint = @_getFootprint(entity)
     unless footprint
       return Q.when(null)
@@ -91,7 +90,7 @@ EntityUtils =
           geoEntity = AtlasManager.renderEntity(entityArgs)
           df.resolve(geoEntity)
       else
-        @_buildGeometryFromFile(id, @_footprintProperty).then(df.resolve, df.reject)
+        df.resolve @_buildGeometryFromFile(id, @_footprintProperty)
     df.promise
 
   _render3dGeometry: (id) -> @_buildGeometryFromFile(id, @_meshProperty)
@@ -123,14 +122,14 @@ EntityUtils =
   render: (id, args) ->
     df = Q.defer()
     @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      @renderQueue.add id, => @_render(id, args).then(df.resolve, df.reject)
+      @renderQueue.add id, => df.resolve @_render(id, args)
     df.promise
 
   _render: (id, args) ->
     df = Q.defer()
     @incrementRenderCount()
     df.promise.fin => @decrementRenderCount()
-    model = Entities.findOne(id)
+    model = @_getModel(id)
     geom_2d = @_getFootprint(model)
     geom_3d = @_getMesh(model)
     isCollection = Entities.getChildren(id).count() > 0
@@ -378,13 +377,15 @@ EntityUtils =
     AtlasManager.zoomTo({position: centroid, duration: 1000})
 
   zoomToEntities: (ids) ->
-    ids ?= Entities.findByProject().map (entity) -> entity._id
+    ids ?= @_getZoomableEntities()
     if ids.length != 0
       # If no entities have geometries, this will fail, so we should zoom to the project if
       # possible.
       AtlasManager.zoomToEntities(ids).fail(-> ProjectUtils.zoomTo()).done()
     else
       Q.when(ProjectUtils.zoomTo())
+
+  _getZoomableEntities: -> Entities.findByProject().map (entity) -> entity._id
 
   _renderEntity: (id, args) ->
     df = Q.defer()
@@ -434,6 +435,8 @@ EntityUtils =
     # Filter GeoEntity objects which are not project entities.
     _.filter entityIds, (id) -> Entities.findOne(id)
 
+  _getModel: (id) -> Entities.findOne(id)
+
   getEntitiesAsJson: (args) ->
     args = @_getProjectAndScenarioArgs(args)
     projectId = args.projectId
@@ -448,7 +451,10 @@ EntityUtils =
       entitiesJson.push(json)
     
     df = Q.defer()
-    entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
+    if Entities.findByProjectAndScenario?
+      entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
+    else
+      entities = Entities.findByProject(projectId).fetch()
     existingEntities = {}
     ids = _.map entities, (entity) -> entity._id
     if Meteor.isServer
@@ -473,13 +479,13 @@ EntityUtils =
   _getProjectAndScenarioArgs: (args) ->
     args ?= {}
     args.projectId ?= Projects.getCurrentId()
-    if args.scenarioId == undefined
+    if args.scenarioId == undefined && ScenarioUtils?
       args.scenarioId = ScenarioUtils.getCurrentId()
     args
 
   downloadInBrowser: (projectId, scenarioId) ->
     projectId ?= Projects.getCurrentId()
-    scenarioId ?= ScenarioUtils.getCurrentId()
+    if ScenarioUtils? then scenarioId ?= ScenarioUtils.getCurrentId()
     Logger.info('Download entities as KMZ', projectId, scenarioId)
     Meteor.call 'entities/to/kmz', projectId, scenarioId, (err, fileId) =>
       if err then throw err
@@ -513,7 +519,7 @@ WKT.getWKT Meteor.bindEnvironment (wkt) ->
   _.extend EntityUtils,
 
     getFormType2d: (id) ->
-      model = Entities.findOne(id)
+      model = @_getModel(id)
       space = model.parameters.space
       geom_2d = space?.geom_2d
       # Entities which have line or point geometries cannot have extrusion or mesh display modes.
