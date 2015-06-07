@@ -217,11 +217,7 @@ EntityUtils =
   renderAll: (args) ->
     df = Q.defer()
     @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      # renderDfs = []
-      # models = Entities.findByProject().fetch()
       @_chooseDisplayMode()
-      # _.each models, (model) => renderDfs.push(@render(model._id))
-      # df.resolve(Q.all(renderDfs))
       promise = @renderQueue.add 'bulk', => @_renderBulk(args)
       df.resolve(promise)
     df.promise
