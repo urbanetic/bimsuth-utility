@@ -120,8 +120,8 @@ EntityUtils =
 
   render: (id, args) ->
     df = Q.defer()
-    @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      @renderQueue.add id, => df.resolve @_render(id, args)
+    @renderQueue.add id, =>
+      @renderingEnabledDf.promise.then Meteor.bindEnvironment => df.resolve @_render(id, args)
     df.promise
 
   _render: (id, args) ->
@@ -396,8 +396,8 @@ EntityUtils =
 
   unrender: (id) ->
     df = Q.defer()
-    @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      @renderQueue.add id, ->
+    @renderQueue.add id, =>
+      @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
         AtlasManager.unrenderEntity(id)
         df.resolve(id)
     df.promise
