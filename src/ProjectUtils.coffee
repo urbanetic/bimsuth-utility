@@ -145,3 +145,13 @@ ProjectUtils =
       throw new Meteor.Error(403, 'No user provided')
     unless AccountsUtil.isOwner(Projects.findOne(projectId), userId)
       throw new Meteor.Error(403, 'User not authorized to view project collections.')
+
+  authorizePublish: (projectId, callback) ->
+    # Ignore the request if no user ID exists.
+    unless @userId then return []
+    try
+      ProjectUtils.assertAuthorization(projectId, @userId)
+      callback.call(@)
+    catch e
+      Logger.error('Error in publications', e, e.stack)
+      @error(e)
