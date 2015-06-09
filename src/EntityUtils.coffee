@@ -452,8 +452,9 @@ EntityUtils =
     Q.all(unrenderPromises).then Meteor.bindEnvironment =>
       renderPromise = @_renderEntitiesBeforeJson(args)
       renderPromise.then ->
-        geoEntities = _.map ids, (id) -> AtlasManager.getEntity(id)
-        _.each geoEntities, (entity) ->
+        _.each ids, (id) ->
+          entity = AtlasManager.getEntity(id)
+          return unless entity
           addEntity(entity)
           _.each entity.getRecursiveChildren(), addEntity
         _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
