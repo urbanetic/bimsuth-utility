@@ -9,8 +9,8 @@ incrementName = (name) ->
 
 ProjectUtils =
 
-# @param {String} id - The ID of the project to serialize.
-# @returns {Object} JSON serialization of the given project and its models. IDs are unaltered.
+  # @param {String} id - The ID of the project to serialize.
+  # @returns {Object} JSON serialization of the given project and its models. IDs are unaltered.
   toJson: (id) ->
     project = Projects.findOne(id)
     unless project
@@ -22,16 +22,16 @@ ProjectUtils =
       result[name] = collection.findByProject(id).fetch()
     result
 
-# Constructs new models from the given JSON serialization. IDs are used to retain references between
-# the new models and new IDs are generated to replace those in the given JSON.
-# @param {Object} json - The serialized JSON. This object may be modified by this method - pass a
-# clone if this is undesirable.
-# @param {Object} args
-# TODO(aramk) Add support for this or remove the option.
-# @param {Boolean} args.update - If true, no new models will be constructed. Instead, any existing
-# models matching with matching IDs will be updated with the values in the given JSON.
-# @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for the
-# models in that collection.
+  # Constructs new models from the given JSON serialization. IDs are used to retain references
+  # between the new models and new IDs are generated to replace those in the given JSON.
+  # @param {Object} json - The serialized JSON. This object may be modified by this method - pass a
+  #     clone if this is undesirable.
+  # @param {Object} args
+  # TODO(aramk) Add support for this or remove the option.
+  # @param {Boolean} args.update - If true, no new models will be constructed. Instead, any existing
+  #     models matching with matching IDs will be updated with the values in the given JSON.
+  # @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for
+  #     the models in that collection.
   fromJson: (json, args) ->
     # Construct all models as new documents in the first pass, mapping old ID references to new IDs.
     # In the second pass, change all IDs to the new ones to maintain references in the new models.
@@ -89,20 +89,25 @@ ProjectUtils =
     )
     df.promise
 
-# @params {String} name
-# @returns {String} The next available name base on the given name with an incremented numerical
-# suffix.
+  # @params {String} name
+  # @returns {String} The next available name base on the given name with an incremented numerical
+  # suffix.
   getNextAvailableName: (name) ->
     newName = name
     while Projects.find({name: newName}).count() != 0
       newName = incrementName(newName)
     newName
 
-# @param {String} id - The ID of the project to duplicate.
-# @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for the
-# models in that collection.
-  duplicate: (id) ->
+  # @param {String} id - The ID of the project to duplicate.
+  # @param {Object} [args]
+  # @param {Function} [args.callback] - A callback which is passed the JSON documents from
+  #     {@link #toJson()} and returns the JSON which is then passed into {@link #fromJson()}.
+  # @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for
+  #     the models in that collection.
+  duplicate: (id, args) ->
     json = @toJson(id)
+    if args?.callback?
+      json = args.callback(json) ? json
     @fromJson(json)
 
   downloadInBrowser: (id) ->
