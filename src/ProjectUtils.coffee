@@ -40,10 +40,6 @@ ProjectUtils =
     # A map of collection names to maps of model IDs from the input to the new IDs constructed.
     idMaps = {}
 
-    # Increment the name of Projects to ensure they are unique.
-    _.each json[Collections.getName(Projects)], (project) =>
-      project.name = @getNextAvailableName(project.name)
-
     createDfs = []
     collectionMap = Collections.getMap(CollectionUtils.getAll())
     _.each collectionMap, (collection, name) ->
