@@ -433,4 +433,6 @@ EntityImporter =
 if Meteor.isServer
 
   Meteor.methods
-    'entities/from/asset': (args) -> Promises.runSync -> EntityImporter.fromAsset(args)
+    'entities/from/asset': (args) ->
+      @unblock()
+      Promises.runSync -> EntityImporter.fromAsset(args)
