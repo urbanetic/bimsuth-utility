@@ -1,2 +1,2 @@
 # bismuth-utility
-A set of utility modules used in Bismuth packages
+A set of utilities for working with GIS apps.

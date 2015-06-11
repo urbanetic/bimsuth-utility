@@ -6,20 +6,19 @@ EntityUtils =
 
   toGeoEntityArgs: (id, args) ->
     df = Q.defer()
-    model = Entities.findOne(id)
-    typeId = SchemaUtils.getParameterValue(model, 'general.type')
+    entity = @_getModel(id)
+    typeId = SchemaUtils.getParameterValue(entity, 'general.type')
     type = Typologies.findOne(typeId)
     typeFillColor = type && SchemaUtils.getParameterValue(type, 'style.fill_color')
     typeBorderColor = type && SchemaUtils.getParameterValue(type, 'style.border_color')
     AtlasConverter.getInstance().then(
       Meteor.bindEnvironment (converter) =>
-        style = model.parameters.style
+        style = entity.parameters.style
         fill_color = style?.fill_color ? typeFillColor ? '#eee'
         border_color = style?.border_color ? typeBorderColor
         if fill_color and !border_color
           border_color = Colors.darken(fill_color)
-        space = model.parameters.space ? {}
-        entity = Entities.findOne(id)
+        space = entity.parameters.space ? {}
         geom_2d = @_getFootprint(entity)
         unless geom_2d
           geom_2d = null
@@ -37,14 +36,13 @@ EntityUtils =
         height = space.height
         if height?
           args.height = height
-        result = converter.toGeoEntityArgs(args)
-        df.resolve(result)
+        df.resolve converter.toGeoEntityArgs(args)
       df.reject
     )
     df.promise
 
   toC3mlArgs: (id) ->
-    entity = Entities.findOne(id)
+    entity = @_getModel(id)
     args = {}
     elevation = SchemaUtils.getParameterValue(entity, 'space.elevation')
     height = SchemaUtils.getParameterValue(entity, 'space.height')
@@ -57,8 +55,8 @@ EntityUtils =
     args
 
   _getGeometryFromFile: (id, paramId) ->
-    entity = Entities.findOne(id)
-    value = SchemaUtils.getParameterValue(entity, 'space.' + paramId)
+    entity = @_getModel(id)
+    value = SchemaUtils.getParameterValue(entity, paramId)
     unless value then return Q.resolve(null)
     # Attempt to parse the value as JSON. If it fails, treat it as a file ID.
     try
@@ -78,7 +76,7 @@ EntityUtils =
     df.promise
 
   _render2dGeometry: (id) ->
-    entity = Entities.findOne(id)
+    entity = @_getModel(id)
     footprint = @_getFootprint(entity)
     unless footprint
       return Q.when(null)
@@ -91,7 +89,7 @@ EntityUtils =
           geoEntity = AtlasManager.renderEntity(entityArgs)
           df.resolve(geoEntity)
       else
-        @_buildGeometryFromFile(id, @_footprintProperty).then(df.resolve, df.reject)
+        df.resolve @_buildGeometryFromFile(id, @_footprintProperty)
     df.promise
 
   _render3dGeometry: (id) -> @_buildGeometryFromFile(id, @_meshProperty)
@@ -122,17 +120,18 @@ EntityUtils =
 
   render: (id, args) ->
     df = Q.defer()
-    @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      @renderQueue.add id, => @_render(id, args).then(df.resolve, df.reject)
+    @renderQueue.add id, =>
+      @renderingEnabledDf.promise.then Meteor.bindEnvironment => df.resolve @_render(id, args)
+      df.promise
     df.promise
 
   _render: (id, args) ->
     df = Q.defer()
     @incrementRenderCount()
     df.promise.fin => @decrementRenderCount()
-    model = Entities.findOne(id)
+    model = @_getModel(id)
     geom_2d = @_getFootprint(model)
-    geom_3d = @_getFootprint(model)
+    geom_3d = @_getMesh(model)
     isCollection = Entities.getChildren(id).count() > 0
 
     unless geom_2d || geom_3d || isCollection
@@ -219,11 +218,7 @@ EntityUtils =
   renderAll: (args) ->
     df = Q.defer()
     @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      # renderDfs = []
-      # models = Entities.findByProject().fetch()
       @_chooseDisplayMode()
-      # _.each models, (model) => renderDfs.push(@render(model._id))
-      # df.resolve(Q.all(renderDfs))
       promise = @renderQueue.add 'bulk', => @_renderBulk(args)
       df.resolve(promise)
     df.promise
@@ -378,13 +373,15 @@ EntityUtils =
     AtlasManager.zoomTo({position: centroid, duration: 1000})
 
   zoomToEntities: (ids) ->
-    ids ?= Entities.findByProject().map (entity) -> entity._id
+    ids ?= @_getZoomableEntities()
     if ids.length != 0
       # If no entities have geometries, this will fail, so we should zoom to the project if
       # possible.
       AtlasManager.zoomToEntities(ids).fail(-> ProjectUtils.zoomTo()).done()
     else
       Q.when(ProjectUtils.zoomTo())
+
+  _getZoomableEntities: -> Entities.findByProject().map (entity) -> entity._id
 
   _renderEntity: (id, args) ->
     df = Q.defer()
@@ -400,10 +397,9 @@ EntityUtils =
 
   unrender: (id) ->
     df = Q.defer()
-    @renderingEnabledDf.promise.then Meteor.bindEnvironment =>
-      @renderQueue.add id, ->
-        AtlasManager.unrenderEntity(id)
-        df.resolve(id)
+    @renderQueue.add id, =>
+      AtlasManager.unrenderEntity(id)
+      df.resolve(id)
     df.promise
 
   show: (id) ->
@@ -434,78 +430,66 @@ EntityUtils =
     # Filter GeoEntity objects which are not project entities.
     _.filter entityIds, (id) -> Entities.findOne(id)
 
+  _getModel: (id) -> Entities.findOne(id)
+
   getEntitiesAsJson: (args) ->
     args = @_getProjectAndScenarioArgs(args)
     projectId = args.projectId
     scenarioId = args.scenarioId
-    entitiesJson = []
-    jsonIds = []
+    df = Q.defer()
+    entities = @_getEntitiesForJson(args)
+    ids = args.ids = _.map entities, (entity) -> entity._id
+    unrenderPromises = @_unrenderEntitiesBeforeJson(ids: ids)
+    Q.all(unrenderPromises).then Meteor.bindEnvironment =>
+      renderPromise = @_renderEntitiesBeforeJson(args)
+      renderPromise.then Meteor.bindEnvironment =>
+        Q.when(@_getEntitiesAsJson(args)).then Meteor.bindEnvironment (entitiesJson) ->
+          _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
+          df.resolve(c3mls: entitiesJson)
+      # Unrender all entities when on the server to prevent using old rendered data.
+      renderPromise.fin Meteor.bindEnvironment =>
+        if Meteor.isServer then _.each ids, (id) => @unrender(id)
+    df.promise
+
+  _getEntitiesAsJson: (args) ->
+    jsonMap = {}
     addEntity = (entity) ->
       id = entity.getId()
-      return if jsonIds[id]
-      json = jsonIds[id] = entity.toJson()
-      entitiesJson.push(json)
-    
-    # renderedIds = []
-    # promises = []
-    df = Q.defer()
+      return if jsonMap[id]
+      jsonMap[id] = entity.toJson()
+    _.each args.ids, (id) ->
+      entity = AtlasManager.getEntity(id)
+      return unless entity
+      addEntity(entity)
+      _.each entity.getRecursiveChildren(), addEntity
+    _.values(jsonMap)
 
-    entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
-    existingEntities = {}
-    ids = _.map entities, (entity) -> entity._id
-      # AtlasManager
-      # existingEntities[]
+  _getEntitiesForJson: (args) ->
+    if Entities.findByProjectAndScenario?
+      entities = Entities.findByProjectAndScenario(projectId, scenarioId).fetch()
+    else
+      entities = Entities.findByProject(projectId).fetch()
+
+  _renderEntitiesBeforeJson: (args) -> EntityUtils.renderAll(args)
+
+  _unrenderEntitiesBeforeJson: (args) ->
     if Meteor.isServer
       # Unrender all entities when on the server to prevent using old rendered data.
+      # unrenderPromises = _.map ids, (id) => @unrender(id)
       unrenderPromises = _.map ids, (id) => @unrender(id)
     else
       unrenderPromises = []
-    Q.all(unrenderPromises).then Meteor.bindEnvironment =>
-      renderPromise = @_renderBulk({ids: ids, projectId: projectId})
-      renderPromise.then -> 
-        geoEntities = _.map ids, (id) -> AtlasManager.getEntity(id)
-        _.each geoEntities, (entity) ->
-          addEntity(entity)
-          _.each entity.getRecursiveChildren(), addEntity
-        _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
-        df.resolve(c3mls: entitiesJson)
-      # Unrender all entities when on the server to prevent using old rendered data.
-      renderPromise.fin Meteor.bindEnvironment => if Meteor.isServer then _.each ids, (id) => @unrender(id)
-    df.promise
-
-    # entities = _.filter entities, (entity) -> !entity.parent
-    # _.each entities, (entity) =>
-    #   id = entity._id
-    #   entityPromises = []
-    #   if Meteor.isServer
-    #     entityPromises.push @unrender(id)
-    #   entityPromises.push @render(id, args)
-    #   promises.push Q.all(entityPromises).then (result) ->
-    #     geoEntity = result[1]
-    #     return unless geoEntity
-    #     addEntity(geoEntity)
-    #     _.each geoEntity.getRecursiveChildren(), (childEntity) -> addEntity(childEntity)
-    # promise = Q.all(promises)
-    
-    # promise = df.promise
-    # promise.then ->
-    #   _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
-    #   {c3mls: entitiesJson}
-    # promise.fin =>
-    #   if Meteor.isServer
-    #     _.each renderedIds, (id) => @unrender(id)
-      # Remove all rendered entities so they aren't cached on the next request.
 
   _getProjectAndScenarioArgs: (args) ->
     args ?= {}
     args.projectId ?= Projects.getCurrentId()
-    if args.scenarioId == undefined
+    if args.scenarioId == undefined && ScenarioUtils?
       args.scenarioId = ScenarioUtils.getCurrentId()
     args
 
   downloadInBrowser: (projectId, scenarioId) ->
     projectId ?= Projects.getCurrentId()
-    scenarioId ?= ScenarioUtils.getCurrentId()
+    if ScenarioUtils? then scenarioId ?= ScenarioUtils.getCurrentId()
     Logger.info('Download entities as KMZ', projectId, scenarioId)
     Meteor.call 'entities/to/kmz', projectId, scenarioId, (err, fileId) =>
       if err then throw err
@@ -539,7 +523,7 @@ WKT.getWKT Meteor.bindEnvironment (wkt) ->
   _.extend EntityUtils,
 
     getFormType2d: (id) ->
-      model = Entities.findOne(id)
+      model = @_getModel(id)
       space = model.parameters.space
       geom_2d = space?.geom_2d
       # Entities which have line or point geometries cannot have extrusion or mesh display modes.
@@ -554,9 +538,9 @@ WKT.getWKT Meteor.bindEnvironment (wkt) ->
 
     getDisplayMode: (id) ->
       formType2d = @getFormType2d(id)
-      if formType2d != 'polygon'
+      if formType2d? && formType2d != 'polygon'
         # When rendering lines and points, ensure the display mode is consistent. With polygons,
-        # we only enable them if 
+        # they are only enabled if the display mode session variable specifies it.
         formType2d
       else if Meteor.isClient
         Session.get(@displayModeSessionVariable)
