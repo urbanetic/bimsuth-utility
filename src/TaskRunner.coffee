@@ -21,16 +21,31 @@ class TaskRunner
     if @pauseDf
       @pauseDf.resolve()
       @pauseDf = null
-
     @status = 'running'
-    @_deferWait()
+
+    # NOTE: Uses system time instead of timers to prevent locking up during synchronous tasks.
+    startTime = null
+    runsTime = 0
+    lastTaskIsWait = false
     runNext = Meteor.bindEnvironment =>
+      if startTime? && !lastTaskIsWait
+        currentTime = new Date().getTime()
+        timeDiff = currentTime - startTime
+        runsTime += timeDiff
+        if runsTime >= @options.runDuration
+          Logger.debug('Task runner ran for', runsTime, 'ms')
+          @_wait()
+          lastTaskIsWait = true
+          runsTime = 0
+      else
+        lastTaskIsWait = false
       if @bufferQueue.length == 0
         Logger.debug('Task runner complete')
         @runDf.resolve()
         @reset()
         return
       callback = @bufferQueue.shift()
+      startTime = new Date().getTime()
       @runQueue.add(callback).fin(runNext)
     
     # Running on an empty queue will reset the promise so we need to store a refernece to the
@@ -40,20 +55,16 @@ class TaskRunner
     runNext()
     promise
 
-  _deferWait: ->
-    runDuration = @options.runDuration
-    Logger.debug('Task runner running for ' + runDuration + 'ms...')
-    @waitHandle = setTimeout (Meteor.bindEnvironment => @_wait()), @options.runDuration
-
   _wait: ->
     waitDuration = @options.waitDuration
     Logger.debug('Task runner ready to wait...')
     wait = =>
       Logger.debug('Task runner waiting for ' + waitDuration + 'ms...')
+      @status = 'waiting'
       @waitDf = Q.defer()
       onDone = Meteor.bindEnvironment =>
-        @_deferWait()
         @waitDf.resolve()
+        @status = 'running'
       setTimeout(onDone, waitDuration)
       @waitDf.promise
     @bufferQueue.unshift(wait)
@@ -70,7 +81,6 @@ class TaskRunner
       @status = 'paused'
       @pauseDf.promise
     @bufferQueue.unshift(pause)
-    clearTimeout(@waitHandle)
 
   reset: ->
     @status == 'idle'
@@ -79,5 +89,4 @@ class TaskRunner
       if df && Q.isPending(df.promise)
         df.reject('Task runner reset')
       @[name] = null
-    clearTimeout(@waitHandle)
     Logger.debug('Task runner reset')
