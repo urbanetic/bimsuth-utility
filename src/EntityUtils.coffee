@@ -491,7 +491,12 @@ EntityUtils =
     projectId ?= Projects.getCurrentId()
     if ScenarioUtils? then scenarioId ?= ScenarioUtils.getCurrentId()
     Logger.info('Download entities as KMZ', projectId, scenarioId)
-    Meteor.call 'entities/to/kmz', projectId, scenarioId, (err, fileId) =>
+    args =
+      projectId: projectId
+      scenarioId: scenarioId
+      createFile: true
+    Meteor.call 'entities/to/kmz', args, (err, fileId) =>
+      # TODO(aramk) Create and return a buffer instead of a file since it's a temporary asset.
       if err then throw err
       if fileId
         Logger.info('Download entities as KMZ with file ID', fileId)
@@ -561,25 +566,23 @@ if Meteor.isServer
       scenarioStr = if scenarioId then '-' + scenarioId else ''
       filePrefix = ProjectUtils.getDatedIdentifier(projectId) + scenarioStr
       filename = filePrefix + '.kmz'
+      type = 'application/vnd.google-earth.kmz'
 
       c3mlData = Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
       Logger.info('Wrote C3ML entities to', FileLogger.log(c3mlData))
       if c3mlData.c3mls.length == 0
         throw new Error('No entities to convert')
       buffer = AssetConversionService.export(c3mlData)
-      
-      file = new FS.File()
-      file.name(filename)
-      file.attachData(Buffers.toArrayBuffer(buffer), type: 'application/vnd.google-earth.kmz')
-      file = Promises.runSync -> Files.upload(file)
-      file._id
+
+      if args.createFile
+        file = new FS.File()
+        file.name(filename)
+        file.attachData(Buffers.toArrayBuffer(buffer), type: type)
+        file = Promises.runSync -> Files.upload(file)
+        file._id
+      else
+        {filename: filename, type: type, buffer: buffer}
 
   Meteor.methods
-    'entities/to/json': (projectId, scenarioId) ->
-      Promises.runSync -> EntityUtils.getEntitiesAsJson
-        projectId: projectId
-        scenarioId: scenarioId
-    'entities/to/kmz': (projectId, scenarioId) ->
-      EntityUtils.convertToKmz
-        projectId: projectId
-        scenarioId: scenarioId
+    'entities/to/json': (args) -> Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
+    'entities/to/kmz': (args) -> EntityUtils.convertToKmz(args)

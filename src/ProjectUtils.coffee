@@ -137,7 +137,7 @@ ProjectUtils =
 
   getDatedIdentifier: (id) ->
     id ?= Projects.getCurrentId()
-    'project-' + id + Dates.toIdentifier(moment())
+    'project-' + id + '-' + Dates.toIdentifier(moment())
 
   assertAuthorization: (projectId, userId) ->
     unless projectId?
