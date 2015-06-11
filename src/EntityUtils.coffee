@@ -122,6 +122,7 @@ EntityUtils =
     df = Q.defer()
     @renderQueue.add id, =>
       @renderingEnabledDf.promise.then Meteor.bindEnvironment => df.resolve @_render(id, args)
+      df.promise
     df.promise
 
   _render: (id, args) ->
@@ -435,32 +436,33 @@ EntityUtils =
     args = @_getProjectAndScenarioArgs(args)
     projectId = args.projectId
     scenarioId = args.scenarioId
-    entitiesJson = []
-    jsonIds = []
-
-    addEntity = (entity) ->
-      id = entity.getId()
-      return if jsonIds[id]
-      json = jsonIds[id] = entity.toJson()
-      entitiesJson.push(json)
-    
     df = Q.defer()
     entities = @_getEntitiesForJson(args)
     ids = args.ids = _.map entities, (entity) -> entity._id
     unrenderPromises = @_unrenderEntitiesBeforeJson(ids: ids)
     Q.all(unrenderPromises).then Meteor.bindEnvironment =>
       renderPromise = @_renderEntitiesBeforeJson(args)
-      renderPromise.then ->
-        geoEntities = _.map ids, (id) -> AtlasManager.getEntity(id)
-        _.each geoEntities, (entity) ->
-          addEntity(entity)
-          _.each entity.getRecursiveChildren(), addEntity
-        _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
-        df.resolve(c3mls: entitiesJson)
+      renderPromise.then Meteor.bindEnvironment =>
+        Q.when(@_getEntitiesAsJson(args)).then Meteor.bindEnvironment (entitiesJson) ->
+          _.each entitiesJson, (json) -> json.type = json.type.toUpperCase()
+          df.resolve(c3mls: entitiesJson)
       # Unrender all entities when on the server to prevent using old rendered data.
       renderPromise.fin Meteor.bindEnvironment =>
         if Meteor.isServer then _.each ids, (id) => @unrender(id)
     df.promise
+
+  _getEntitiesAsJson: (args) ->
+    jsonMap = {}
+    addEntity = (entity) ->
+      id = entity.getId()
+      return if jsonMap[id]
+      jsonMap[id] = entity.toJson()
+    _.each args.ids, (id) ->
+      entity = AtlasManager.getEntity(id)
+      return unless entity
+      addEntity(entity)
+      _.each entity.getRecursiveChildren(), addEntity
+    _.values(jsonMap)
 
   _getEntitiesForJson: (args) ->
     if Entities.findByProjectAndScenario?
@@ -468,7 +470,7 @@ EntityUtils =
     else
       entities = Entities.findByProject(projectId).fetch()
 
-  _renderEntitiesBeforeJson: (args) -> @_renderBulk(args)
+  _renderEntitiesBeforeJson: (args) -> EntityUtils.renderAll(args)
 
   _unrenderEntitiesBeforeJson: (args) ->
     if Meteor.isServer
