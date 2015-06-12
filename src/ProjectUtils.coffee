@@ -144,8 +144,9 @@ ProjectUtils =
       throw new Meteor.Error(500, 'No project specified when subscribing.')
     unless userId?
       throw new Meteor.Error(403, 'No user provided')
-    unless AccountsUtil.isOwner(Projects.findOne(projectId), userId)
-      throw new Meteor.Error(403, 'User not authorized to view project collections.')
+    unless AccountsUtil.isOwner(Projects.findOne(projectId), userId) || AccountsUtil.isAdmin(userId)
+      throw new Meteor.Error(403, 'User ' + userId +
+          ' not authorized to view collections of project ' + projectId)
 
   authorizePublish: (projectId, callback) ->
     # Ignore the request if no user ID exists.
