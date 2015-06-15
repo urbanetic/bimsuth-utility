@@ -525,7 +525,8 @@ EntityUtils =
 Meteor.startup -> EntityUtils.reset()
 
 WKT.getWKT Meteor.bindEnvironment (wkt) ->
-  _.extend EntityUtils,
+  # Uses _.defaults to prevent a race condition caused if another package redefines these methods.
+  _.defaults EntityUtils,
 
     getFormType2d: (id) ->
       model = @_getModel(id)
