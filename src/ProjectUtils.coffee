@@ -153,9 +153,12 @@ ProjectUtils =
     unless @userId then return []
     try
       ProjectUtils.assertAuthorization(projectId, @userId)
-      callback?.call(@)
-      return true
+      if callback?
+        return callback.call(@)
+      else
+        return true
     catch e
       Logger.error('Error in publications', e, e.stack)
       @error(e)
-      return false
+      return false unless callback?
+
