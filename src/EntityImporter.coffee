@@ -408,7 +408,7 @@ EntityImporter =
             fill_color: fill_color
             border_color: border_color
           inputs: inputs
-      model = @_mapEntity(model) ? model
+      model = @_mapEntity(model, args) ? model
       callback = (err, insertId) ->
         if err
           Logger.error('Failed to insert entity', err)
