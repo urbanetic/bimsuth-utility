@@ -53,7 +53,8 @@ EntityImporter =
       return Q.reject('Either c3mls or fileId must be provided for importing.')
     c3mlsPromise.fail(df.reject)
     c3mlsPromise.then Meteor.bindEnvironment (c3mls) =>
-      df.resolve @fromC3mls(Setter.merge(args, {c3mls: c3mls}))
+      args.c3mls = c3mls
+      df.resolve @fromC3mls(args)
     df.promise
 
   fromC3mls: (args) ->
@@ -434,5 +435,4 @@ if Meteor.isServer
 
   Meteor.methods
     'entities/from/asset': (args) ->
-      @unblock()
       Promises.runSync -> EntityImporter.fromAsset(args)
