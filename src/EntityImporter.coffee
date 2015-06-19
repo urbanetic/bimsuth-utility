@@ -482,7 +482,8 @@ if Meteor.isServer
       Promises.runSync ->
         promise = EntityImporter.fromAsset(args)
         promise.then(df.resolve, df.reject)
-        promise
+        # Cancelling the import should return the import method.
+        df.promise
     
     'entities/from/asset/cancel': (args) ->
       importId = args.importId
