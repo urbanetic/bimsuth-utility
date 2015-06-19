@@ -36,11 +36,11 @@ Meteor.startup ->
 EntityImporter =
 
   fromAsset: (args) ->
+    return if isImportCancelled(args)
     info = {fileId: args.fileId}
     if args.c3mls
       info.c3mlsCount = args.c3mls.length
     Logger.info 'Importing entities from asset', info
-    df = Q.defer()
     if args.c3mls
       c3mlsPromise = Q.resolve(args.c3mls)
     else if args.fileId
@@ -51,6 +51,7 @@ EntityImporter =
         c3mlsPromise = AssetUtils.fromFile(args.fileId, args).then (result) -> result.c3mls
     else
       return Q.reject('Either c3mls or fileId must be provided for importing.')
+    df = Q.defer()
     c3mlsPromise.fail(df.reject)
     c3mlsPromise.then Meteor.bindEnvironment (c3mls) =>
       args.c3mls = c3mls
@@ -58,6 +59,8 @@ EntityImporter =
     df.promise
 
   fromC3mls: (args) ->
+    importId = args.importId
+    return if isImportCancelled(importId)
     c3mls = args.c3mls
     unless Types.isArray(c3mls)
       return Q.reject('C3ML not defined as an array.')
@@ -163,7 +166,13 @@ EntityImporter =
         if parentId
           edges.push([parentId, c3mlId])
           sortMap[c3mlId] = sortMap[parentId] = true
-        runner.add => @_geometryFromC3ml(c3ml, geomDf)
+        runner.add =>
+          if isImportCancelled(importId)
+            Logger.info('Cancelling import tasks', importId)
+            df.reject()
+            runner.reset()
+            return
+          @_geometryFromC3ml(c3ml, geomDf)
 
       # Add any entities which are not part of a hierarchy and weren't in the topological sort.
       sortedIds = topsort(edges)
@@ -180,6 +189,11 @@ EntityImporter =
           _.each sortedIds, (c3mlId, c3mlIndex) =>
             modelDf = entityDfMap[c3mlId]
             runner.add =>
+              if isImportCancelled(importId)
+                Logger.info('Cancelling import tasks', importId)
+                df.reject()
+                runner.reset()
+                return
               c3ml = c3mlMap[c3mlId]
               c3mlProps = c3ml.properties
               height = popParam(c3mlProps, HeightParamIds)
@@ -431,8 +445,51 @@ EntityImporter =
   _mapTypology: (doc) -> doc
   _mapGeometry: (geom) -> geom
 
+####################################################################################################
+# USER REQUEST HANDLING
+####################################################################################################
+
+EntityImporter.generateId = -> Collections.generateId()
+
+importRequestMap = {}
+isImportCancelled = (args) ->
+  importId = if Types.isObjectLiteral(args) then args.importId else args
+  df = importRequestMap[importId]
+  # Since we remove the promise when it's finished, if it doesn't exist and the import ID is valid
+  # we assume it was cancelled.
+  if df then df.promise.isRejected() else importId?
+
+####################################################################################################
+# SERVER METHODS
+####################################################################################################
+
 if Meteor.isServer
 
   Meteor.methods
+
     'entities/from/asset': (args) ->
-      Promises.runSync -> EntityImporter.fromAsset(args)
+      # Allows cancel requests.
+      @unblock()
+      importId = args.importId
+      df = null
+      if importId?
+        if importRequestMap[importId]
+          throw new Meteor.Error(500, 'Import request with ID ' + importId + ' already exists')
+        df = importRequestMap[importId] = Q.defer()
+        # Removed to prevent memory leaks.
+        df.promise.fin -> delete importRequestMap[importId]
+        Logger.info('Import request started', importId)
+      Promises.runSync ->
+        promise = EntityImporter.fromAsset(args)
+        if df? then df.resolve(promise)
+        promise
+    
+    'entities/from/asset/cancel': (args) ->
+      importId = args.importId
+      Logger.info('Cancelling import request...', importId)
+      @unblock()
+      df = importRequestMap[importId]
+      unless df
+        throw new Meteor.Error(500, 'Import cancel request not found with ID: ' + importId)
+      df.reject('Import cancelled')
+      Logger.info('Import request cancelled', importId)

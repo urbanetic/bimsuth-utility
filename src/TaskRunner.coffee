@@ -6,8 +6,6 @@ class TaskRunner
       waitDuration: 100
     }, options)
     @runQueue = new DeferredQueue()
-    @bufferQueue = []
-    @status == 'idle'
     @reset()
 
   add: (callback) ->
@@ -28,6 +26,7 @@ class TaskRunner
     runsTime = 0
     lastTaskIsWait = false
     runNext = Meteor.bindEnvironment =>
+
       if startTime? && !lastTaskIsWait
         currentTime = new Date().getTime()
         timeDiff = currentTime - startTime
@@ -46,7 +45,9 @@ class TaskRunner
         return
       callback = @bufferQueue.shift()
       startTime = new Date().getTime()
-      @runQueue.add(callback).fin(runNext)
+      @runQueue.add(callback).fin =>
+        # Prevent running the next task if the runner was paused or reset.
+        if @status == 'running' then runNext()
     
     # Running on an empty queue will reset the promise so we need to store a refernece to the
     # promise in case it's removed.
@@ -74,7 +75,7 @@ class TaskRunner
       return @pauseDf.promise
     Logger.debug('Task runner pausing...')
     @pauseDf = Q.defer()
-    @status == 'pausing'
+    @status = 'pausing'
     pause = =>
       # If the pause was cancelled, ignore this callback.
       return unless @pauseDf
@@ -83,7 +84,10 @@ class TaskRunner
     @bufferQueue.unshift(pause)
 
   reset: ->
-    @status == 'idle'
+    Logger.debug('Resetting task runner')
+    @status = 'idle'
+    @runQueue.clear()
+    @bufferQueue = []
     _.each ['runDf', 'waitDf'], (name) =>
       df = @[name]
       if df && Q.isPending(df.promise)
