@@ -481,7 +481,7 @@ if Meteor.isServer
         Logger.info('Import request started', importId)
       Promises.runSync ->
         promise = EntityImporter.fromAsset(args)
-        if df? then df.resolve(promise)
+        promise.then(df.resolve, df.reject)
         promise
     
     'entities/from/asset/cancel': (args) ->
@@ -489,7 +489,9 @@ if Meteor.isServer
       Logger.info('Cancelling import request...', importId)
       @unblock()
       df = importRequestMap[importId]
-      unless df
-        throw new Meteor.Error(500, 'Import cancel request not found with ID: ' + importId)
-      df.reject('Import cancelled')
-      Logger.info('Import request cancelled', importId)
+      if df
+        df.reject('Import cancelled')
+        Logger.info('Import request cancelled', importId)
+      else
+        Logger.warn('Import request cannot be cancelled', importId)
+ 
