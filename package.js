@@ -35,7 +35,6 @@ Package.onUse(function (api) {
     'TaskRunner',
     'EntityImporter',
     'EntityUtils',
-    'ParamUtils',
     'ProjectUtils'
   ], ['client', 'server']);
   api.addFiles([
@@ -48,7 +47,6 @@ Package.onUse(function (api) {
     'src/TaskRunner.coffee',
     'src/EntityImporter.coffee',
     'src/EntityUtils.coffee',
-    'src/ParamUtils.coffee',
     'src/ProjectUtils.coffee'
   ], ['client', 'server']);
 });
