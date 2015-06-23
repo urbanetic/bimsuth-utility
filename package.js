@@ -13,7 +13,8 @@ Package.onUse(function (api) {
     'underscore',
     'aramk:q@1.0.1_1',
     'aramk:utility@0.8.6',
-    'urbanetic:atlas-util@0.3.0'
+    'urbanetic:atlas-util@0.3.0',
+    'urbanetic:bismuth-schema-utility@0.1.0'
   ], ['client', 'server']);
   api.use([
     'urbanetic:bismuth-schema@0.1.0'
