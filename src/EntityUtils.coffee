@@ -490,11 +490,11 @@ EntityUtils =
   downloadInBrowser: (projectId, scenarioId) ->
     projectId ?= Projects.getCurrentId()
     if ScenarioUtils? then scenarioId ?= ScenarioUtils.getCurrentId()
-    Logger.info('Download entities as KMZ', projectId, scenarioId)
     args =
       projectId: projectId
       scenarioId: scenarioId
       createFile: true
+    Logger.info('Download entities as KMZ', args)
     Meteor.call 'entities/to/kmz', args, (err, fileId) =>
       # TODO(aramk) Create and return a buffer instead of a file since it's a temporary asset.
       if err then throw err
@@ -569,10 +569,11 @@ if Meteor.isServer
       filename = filePrefix + '.kmz'
       type = 'application/vnd.google-earth.kmz'
 
+      Logger.info('Generating C3ML entities...')
       c3mlData = Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
       Logger.info('Wrote C3ML entities to', FileLogger.log(c3mlData))
       if c3mlData.c3mls.length == 0
-        throw new Error('No entities to convert')
+        throw new Meteor.Error(500, 'No entities to convert')
       buffer = AssetConversionService.export(c3mlData)
 
       if args.createFile
@@ -585,5 +586,9 @@ if Meteor.isServer
         {filename: filename, type: type, buffer: buffer}
 
   Meteor.methods
-    'entities/to/json': (args) -> Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
-    'entities/to/kmz': (args) -> EntityUtils.convertToKmz(args)
+    'entities/to/json': (args) ->
+      @unblock()
+      Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
+    'entities/to/kmz': (args) ->
+      @unblock()
+      EntityUtils.convertToKmz(args)
