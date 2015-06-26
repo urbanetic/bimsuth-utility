@@ -162,3 +162,60 @@ ProjectUtils =
       @error(e)
       return false unless callback?
 
+Meteor.startup ->
+  return unless Meteor.isServer
+
+  ##################################################################################################
+  # PROJECT DATE
+  ##################################################################################################
+
+  # Updating project or models in the project will update the modified date of a project.
+
+  getCurrentDate = -> moment().toDate()
+
+  Projects.before.insert (userId, doc) ->
+    unless doc.dateModified
+      doc.dateModified = getCurrentDate()
+      doc.userModified = userId
+
+  Projects.before.update (userId, doc, fieldNames, modifier) ->
+    modifier.$set ?= {}
+    delete modifier.$unset?.dateModified
+    modifier.$set.dateModified = getCurrentDate()
+    modifier.$set.userModified = userId
+
+  _.each _.without(CollectionUtils.getAll(), Projects), (collection) ->
+    _.each ['insert', 'update'], (operation) ->
+      collection.after[operation] (userId, doc) ->
+        projectId = doc[SchemaUtils.projectIdProperty]
+        return unless projectId
+        Projects.update projectId,
+          $set: {dateModified: getCurrentDate(), userModified: userId}
+
+  ##################################################################################################
+  # DUPLICATE
+  ##################################################################################################
+
+  Meteor.methods
+    'projects/duplicate': (id) ->
+      userId = @userId
+      ProjectUtils.assertAuthorization(id, userId)
+      Promises.runSync -> ProjectUtils.duplicate(id).then Meteor.bindEnvironment (idMaps) ->
+        newId = idMaps[Collections.getName(Projects)][id]
+        Projects.update newId, $set: {dateModified: new Date, userModified: userId}
+
+  ##################################################################################################
+  # REMOVAL
+  ##################################################################################################
+
+  Projects.after.remove (userId, doc) ->
+    Logger.info('Cleaning up after removing project', doc)
+    id = doc._id
+    selector = {projectId: id}
+    _.each CollectionUtils.getAll(), (collection) ->
+      count = collection.remove(selector)
+      if count > 0
+        console.log('Removed ' + count + ' ' + Collections.getName(collection))
+    files = Files.find(selector).fetch()
+    Logger.info('Removing files for project', doc, files)
+    Files.remove(selector)
