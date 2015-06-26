@@ -154,6 +154,8 @@ EntityImporter =
           Logger.debug('Parsed ' + geometryCount + '/' + c3mls.length + ' geometries')
 
       _.each c3mls, (c3ml, i) =>
+        if args.forEachC3ml
+          c3ml = c3mls[i] = args.forEachC3ml.call(EntityImporter, c3ml, i) ? c3ml
         c3mlId = c3ml.id
         c3mlMap[c3mlId] = c3ml
         # TODO(aramk) Use the ID given by ACS instead of attempting to name it here.
@@ -296,7 +298,9 @@ EntityImporter =
     else if type == 'feature'
       @_geometryFromC3mlFeature(c3ml, geomDf)
     else
-      Logger.warn('Skipping unhandled c3ml', c3ml)
+      msg = 'Skipping unhandled c3ml'
+      Logger.warn(msg, c3ml)
+      geomDf.reject(msg)
     geomDf.promise
 
   _geometryFromC3mlMesh: (c3ml, geomDf) ->
@@ -424,6 +428,9 @@ EntityImporter =
             border_color: border_color
           inputs: inputs
       model = @_mapEntity(model, args) ? model
+      if args.forEachEntity
+        model = args.forEachEntity.call(EntityImporter, {entity: model, c3ml: c3ml}) ? model
+
       callback = (err, insertId) ->
         if err
           Logger.error('Failed to insert entity', err)
@@ -438,7 +445,9 @@ EntityImporter =
           modelDf.reject(err)
         else
           modelDf.resolve(insertId)
+      
       Entities.insert model, callback
+    
     modelDf.promise
 
   _mapEntity: (doc) -> doc
