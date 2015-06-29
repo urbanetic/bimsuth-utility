@@ -71,7 +71,7 @@ EntityImporter =
     limit = args.limit
     if limit
       c3mls = c3mls.slice(0, limit)
-      Logger.info 'Limited to', limit, 'entities...'
+      Logger.info 'Limited to', limit, 'entities'
 
     projectId = args.projectId ? Projects.getCurrentId()
     unless projectId
