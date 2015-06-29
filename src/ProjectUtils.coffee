@@ -117,7 +117,7 @@ ProjectUtils =
     location = Projects.getLocationCoords(projectId)
     return unless location
     if location.latitude? and location.longitude?
-      location.elevation ?= 5000
+      location.elevation ?= 3000
       Logger.debug 'Loading project location', location
       AtlasManager.zoomTo
         position: location
