@@ -172,7 +172,7 @@ Meteor.startup ->
   # Updating project or models in the project will update the modified date of a project.
 
   getCurrentDate = -> moment().toDate()
-  updateProjectModifiedDate = _.throttle (projectId, userId) ->
+  updateProjectModifiedDate = _.throttle Meteor.bindEnvironment (projectId, userId) ->
     Projects.update projectId, $set: {dateModified: getCurrentDate(), userModified: userId}
   , 5000
 
