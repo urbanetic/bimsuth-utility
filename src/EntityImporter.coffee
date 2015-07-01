@@ -63,7 +63,7 @@ EntityImporter =
     return if isImportCancelled(importId)
     c3mls = args.c3mls
     unless Types.isArray(c3mls)
-      return Q.reject('C3ML not defined as an array.')
+      return Q.reject('"c3mls" must be an array.')
 
     Logger.info 'Importing entities from', c3mls.length, 'c3mls...'
     if Meteor.isServer then FileLogger.log(args)
@@ -439,7 +439,7 @@ EntityImporter =
             if entityStr.length > CONSOLE_LOG_SIZE_LIMIT && Meteor.isServer
               FileLogger.log(entityStr)
             else
-              Logger.debug('Failed entity', entityStr)
+              Logger.debug('Failed entity insert', entityStr.slice(0, 100) + '...')
           catch e
             Logger.error('Failed to log entity insert failure', e)
           modelDf.reject(err)
