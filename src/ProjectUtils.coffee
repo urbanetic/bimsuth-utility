@@ -19,7 +19,7 @@ ProjectUtils =
     collections = _.without(CollectionUtils.getAll(), Projects)
     _.each Collections.getMap(collections), (collection, name) ->
       # TODO(aramk) This will ignore collectionType references which don't have "projectId" fields.
-      result[name] = collection.findByProject?(id).fetch()
+      result[name] = collection.findByProject?(id).fetch() ? []
     result
 
   # Constructs new models from the given JSON serialization. IDs are used to retain references
@@ -46,10 +46,11 @@ ProjectUtils =
       idMap = idMaps[name] = {}
       _.each json[name], (model) ->
         oldModelId = model._id
+        oldModel = collection.findOne(oldModelId)
         # Ignore documents in the JSON which don't have a projectId and exist in the collection,
         # indicating they should be shared between projects.
-        projectId = SchemaUtils.getParameterValue(model, SchemaUtils.projectIdProperty)
-        return if !projectId? && collection.findOne(oldModelId)?
+        projectId = model[SchemaUtils.projectIdProperty]
+        return if collection != Projects && !projectId? && oldModel?
         createDf = Q.defer()
         createDfs.push(createDf.promise)
         delete model._id
@@ -63,6 +64,7 @@ ProjectUtils =
             newModelId = result
             idMap[oldModelId] = newModelId
             createDf.resolve(newModelId)
+      
     refDfs = []
     Q.all(createDfs).then(Meteor.bindEnvironment(
       ->
@@ -105,10 +107,13 @@ ProjectUtils =
   # @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for
   #     the models in that collection.
   duplicate: (id, args) ->
+    Logger.info('Duplicating project', id, args)
     json = @toJson(id)
     if args?.callback?
       json = args.callback(json) ? json
-    @fromJson(json)
+    result = @fromJson(json)
+    Logger.info('Duplicated project', id)
+    result
 
   downloadInBrowser: (id) ->
     Logger.info 'Exporting project', id
@@ -221,7 +226,7 @@ Meteor.startup ->
     _.each CollectionUtils.getAll(), (collection) ->
       count = collection.remove(selector)
       if count > 0
-        console.log('Removed ' + count + ' ' + Collections.getName(collection))
+        Logger.info('Removed ' + count + ' ' + Collections.getName(collection))
     files = Files.find(selector).fetch()
     Logger.info('Removing files for project', doc, files)
     Files.remove(selector)
