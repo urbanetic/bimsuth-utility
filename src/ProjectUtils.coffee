@@ -13,13 +13,13 @@ ProjectUtils =
   # @returns {Object} JSON serialization of the given project and its models. IDs are unaltered.
   toJson: (id) ->
     project = Projects.findOne(id)
-    unless project
-      throw new Error('Project with ID ' + id + ' not found')
+    unless project then throw new Error('Project with ID ' + id + ' not found')
     result = {}
     result[Collections.getName(Projects)] = [project]
     collections = _.without(CollectionUtils.getAll(), Projects)
     _.each Collections.getMap(collections), (collection, name) ->
-      result[name] = collection.findByProject(id).fetch()
+      # TODO(aramk) This will ignore collectionType references which don't have "projectId" fields.
+      result[name] = collection.findByProject?(id).fetch()
     result
 
   # Constructs new models from the given JSON serialization. IDs are used to retain references
@@ -45,9 +45,13 @@ ProjectUtils =
     _.each collectionMap, (collection, name) ->
       idMap = idMaps[name] = {}
       _.each json[name], (model) ->
+        oldModelId = model._id
+        # Ignore documents in the JSON which don't have a projectId and exist in the collection,
+        # indicating they should be shared between projects.
+        projectId = SchemaUtils.getParameterValue(model, SchemaUtils.projectIdProperty)
+        return if !projectId? && collection.findOne(oldModelId)?
         createDf = Q.defer()
         createDfs.push(createDf.promise)
-        oldModelId = model._id
         delete model._id
         # TODO(aramk) Disabling validation is dangerous - only done here to avoid validation
         # errors which don't have messages at the moment. Improve collection2 to provide the
