@@ -11,35 +11,31 @@ EntityUtils =
     type = Typologies.findOne(typeId)
     typeFillColor = type && SchemaUtils.getParameterValue(type, 'style.fill_color')
     typeBorderColor = type && SchemaUtils.getParameterValue(type, 'style.border_color')
-    AtlasConverter.getInstance().then(
-      Meteor.bindEnvironment (converter) =>
-        style = entity.parameters.style
-        fill_color = style?.fill_color ? typeFillColor ? '#eee'
-        border_color = style?.border_color ? typeBorderColor
-        if fill_color and !border_color
-          border_color = Colors.darken(fill_color)
-        space = entity.parameters.space ? {}
-        geom_2d = @_getFootprint(entity)
-        unless geom_2d
-          geom_2d = null
-          # throw new Error('No 2D geometry - cannot render entity with ID ' + id)
-        displayMode = args?.displayMode ? @getDisplayMode(id)
-        args = Setter.merge({
-          id: id
-          vertices: geom_2d
-          elevation: space.elevation
-          displayMode: displayMode
-          style:
-            fillColor: fill_color
-            borderColor: border_color
-        }, args)
-        height = space.height
-        if height?
-          args.height = height
-        df.resolve converter.toGeoEntityArgs(args)
-      df.reject
-    )
-    df.promise
+    converter = @getConverter()
+    style = entity.parameters.style
+    fill_color = style?.fill_color ? typeFillColor ? '#eee'
+    border_color = style?.border_color ? typeBorderColor
+    if fill_color and !border_color
+      border_color = Colors.darken(fill_color)
+    space = entity.parameters.space ? {}
+    geom_2d = @_getFootprint(entity)
+    unless geom_2d
+      geom_2d = null
+      # throw new Error('No 2D geometry - cannot render entity with ID ' + id)
+    displayMode = args?.displayMode ? @getDisplayMode(id)
+    args = Setter.merge({
+      id: id
+      vertices: geom_2d
+      elevation: space.elevation
+      displayMode: displayMode
+      style:
+        fillColor: fill_color
+        borderColor: border_color
+    }, args)
+    height = space.height
+    if height?
+      args.height = height
+    converter.toGeoEntityArgs(args)
 
   toC3mlArgs: (id) ->
     entity = @_getModel(id)
@@ -85,9 +81,9 @@ EntityUtils =
       isWKT = wkt.isWKT(footprint)
       if isWKT
         # Hidden by default since we change the display mode to toggle visibility.
-        @toGeoEntityArgs(id, {show: false}).then Meteor.bindEnvironment (entityArgs) =>
-          geoEntity = AtlasManager.renderEntity(entityArgs)
-          df.resolve(geoEntity)
+        entityArgs = @toGeoEntityArgs(id, {show: false})
+        geoEntity = AtlasManager.renderEntity(entityArgs)
+        df.resolve(geoEntity)
       else
         df.resolve @_buildGeometryFromFile(id, @_footprintProperty)
     df.promise
@@ -169,17 +165,14 @@ EntityUtils =
                 # If we construct the 2d geometry from a collection of entities rather than
                 # WKT, the geometry is a collection rather than a feature. Create a new
                 # feature to store both 2d and 3d geometries.
-                @toGeoEntityArgs(id, {vertices: null}).then(
-                  Meteor.bindEnvironment (args) ->
-                    geoEntity = AtlasManager.renderEntity(args)
-                    addedGeometry.push(geoEntity)
-                    if entity2d
-                      geoEntity.setForm(Feature.DisplayMode.FOOTPRINT, entity2d)
-                      args.height? && entity2d.setHeight(args.height)
-                      args.elevation? && entity2d.setElevation(args.elevation)
-                    geoEntityDf.resolve(geoEntity)
-                  geoEntityDf.reject
-                )
+                args = @toGeoEntityArgs(id, {vertices: null})
+                geoEntity = AtlasManager.renderEntity(args)
+                addedGeometry.push(geoEntity)
+                if entity2d
+                  geoEntity.setForm(Feature.DisplayMode.FOOTPRINT, entity2d)
+                  args.height? && entity2d.setHeight(args.height)
+                  args.elevation? && entity2d.setElevation(args.elevation)
+                geoEntityDf.resolve(geoEntity)
               geoEntityDf.promise.then(
                 Meteor.bindEnvironment (geoEntity) =>
                   if entity3d
@@ -384,16 +377,9 @@ EntityUtils =
   _getZoomableEntities: -> Entities.findByProject().map (entity) -> entity._id
 
   _renderEntity: (id, args) ->
-    df = Q.defer()
-    @toGeoEntityArgs(id, args).then(
-      Meteor.bindEnvironment (entityArgs) ->
-        unless entityArgs
-          console.error('Cannot render - no entityArgs')
-          return
-        df.resolve(AtlasManager.renderEntity(entityArgs))
-      df.reject
-    )
-    df.promise
+    entityArgs = @toGeoEntityArgs(id, args)
+    unless entityArgs then return Q.reject('Cannot render - no entityArgs')
+    AtlasManager.renderEntity(entityArgs)
 
   unrender: (id) ->
     df = Q.defer()
@@ -521,6 +507,13 @@ EntityUtils =
     @renderingEnabledDf = Q.defer()
     @renderingEnabledDf.resolve()
     @prevRenderingEnabledDf = null
+
+  getConverter: -> converter
+
+converter = null
+converterPromise = AtlasConverter.getInstance()
+converterPromise.then (Meteor.bindEnvironment (_converter) => converter = _converter)
+    , Meteor.bindEnvironment (err) -> Logger.error('Could not set up AtlasConverter', err)
 
 Meteor.startup -> EntityUtils.reset()
 
