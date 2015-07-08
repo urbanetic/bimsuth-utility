@@ -6,6 +6,11 @@ Package.describe({
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });
 
+Npm.depends({
+  'request': '2.37.0',
+  'concat-stream': '1.4.7'
+});
+
 Package.onUse(function (api) {
   api.versionsFrom('METEOR@0.9.0');
   api.use([
@@ -31,7 +36,8 @@ Package.onUse(function (api) {
     'Csv'
   ], 'client');
   api.export([
-    'FileLogger'
+    'FileLogger',
+    'Request'
   ], 'server');
   api.export([
     'TaskRunner',
@@ -43,7 +49,8 @@ Package.onUse(function (api) {
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
-    'src/FileLogger.coffee'
+    'src/FileLogger.coffee',
+    'src/Request.coffee'
   ], 'server');
   api.addFiles([
     'src/TaskRunner.coffee',
