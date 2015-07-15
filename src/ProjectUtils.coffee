@@ -153,7 +153,9 @@ ProjectUtils =
       throw new Meteor.Error(500, 'No project specified when subscribing.')
     unless userId?
       throw new Meteor.Error(403, 'No user provided')
-    unless AccountsUtil.isOwner(Projects.findOne(projectId), userId) || AccountsUtil.isAdmin(userId)
+    unless (AccountsUtil.isOwner(Projects.findOne(projectId), userId) ||
+        AccountsUtil.isAdmin(userId) ||
+        Projects.isPublic(projectId))
       throw new Meteor.Error(403, 'User ' + userId +
           ' not authorized to view collections of project ' + projectId)
 
@@ -170,6 +172,23 @@ ProjectUtils =
       Logger.error('Error in publications', e, e.stack)
       @error(e)
       return false unless callback?
+
+  # Returns a boolean which is true when the given project is a public, the given user is not
+  # the owner of this project, and is not an admin.
+  #  * userId - A string of the user ID. If not provided, the current user ID is used (if any).
+  #  * projectId - A string of the project ID. If unprovided, the current project ID is used
+  #                (if any).
+  isVisitingUser: (userId, projectId) ->
+    userId ?= Meteor.userId()
+    projectId ?= Projects.getCurrentId()
+    project = Projects.findOne(_id: projectId)
+    Projects.isPublic(projectId) && !AccountsUtil.isOwnerOrAdmin(project, userId)
+
+  isOwnerOrAdmin: (projectId, userId) ->
+    projectId ?= Projects.getCurrentId()
+    project = Projects.findOne(_id: projectId)
+    userId ?= Meteor.userId()
+    AccountsUtil.isOwnerOrAdmin(project, userId)
 
 Meteor.startup ->
   return unless Meteor.isServer
