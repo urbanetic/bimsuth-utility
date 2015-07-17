@@ -424,7 +424,7 @@ EntityUtils =
     scenarioId = args.scenarioId
     df = Q.defer()
     entities = @_getEntitiesForJson(args)
-    ids = args.ids = _.map entities, (entity) -> entity._id
+    ids = args.ids = _.pluck entities, '_id'
     unrenderPromises = @_unrenderEntitiesBeforeJson(ids: ids)
     Q.all(unrenderPromises).then Meteor.bindEnvironment =>
       renderPromise = @_renderEntitiesBeforeJson(args)
