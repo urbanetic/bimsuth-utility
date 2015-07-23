@@ -115,30 +115,6 @@ EntityImporter =
       # A map of parent IDs to a map of children names to their IDs.
       childrenNameMap = {}
 
-      getOrCreateTypologyByName = (name) =>
-        typePromise = typePromiseMap[name]
-        return typePromise if typePromise
-        Logger.debug('Creating type', name)
-        typeDf = Q.defer()
-        typePromiseMap[name] = typeDf.promise
-        type = Typologies.findByName(name, projectId)
-        if type
-          typeDf.resolve(type._id)
-        else
-          fillColor = Typologies.getNextAvailableColor(projectId, {exclude: usedColors})
-          usedColors.push(fillColor)
-          typologyDoc =
-            name: name
-            project: projectId
-          SchemaUtils.setParameterValue(typologyDoc, 'style.fill_color', fillColor)
-          typologyDoc = @_mapTypology(typologyDoc) ? typologyDoc
-          Typologies.insert typologyDoc, (err, typeId) ->
-            if err
-              typeDf.reject(err)
-            else
-              typeDf.resolve(typeId)
-        typeDf.promise
-
       Logger.info('Inserting ' + c3mls.length + ' c3mls...')
 
       insertedCount = 0
@@ -242,9 +218,14 @@ EntityImporter =
                 modelDf.promise.then(incrementC3mlCount)
 
                 if typeName
-                  getOrCreateTypologyByName(typeName).then Meteor.bindEnvironment (typeId) ->
+                  typeArgs =
+                    typePromiseMap: typePromiseMap
+                    projectId: projectId
+                    usedColors: usedColors
+                  typeSuccess = Meteor.bindEnvironment (typeId) ->
                     createEntityArgs.typeId = typeId
                     createEntity()
+                  @getOrCreateTypologyByName(typeName, typeArgs).then(typeSuccess, createEntity)
                 else
                   createEntity()
               
@@ -449,6 +430,37 @@ EntityImporter =
       Entities.insert model, callback
     
     modelDf.promise
+
+  getOrCreateTypologyByName: (name, args) ->
+    typePromiseMap = args.typePromiseMap ? {}
+    typePromise = typePromiseMap[name]
+    return typePromise if typePromise
+    Logger.debug('Creating type', name)
+    typeDf = Q.defer()
+    typePromiseMap[name] = typeDf.promise
+
+    projectId = args.projectId
+    unless projectId then return Q.reject('No projectId provided')
+
+    usedColors = args.usedColors ? []
+    
+    type = Typologies.findByName(name, projectId)
+    if type
+      typeDf.resolve(type._id)
+    else
+      fillColor = Typologies.getNextAvailableColor(projectId, {exclude: usedColors})
+      usedColors.push(fillColor)
+      typologyDoc =
+        name: name
+        project: projectId
+      SchemaUtils.setParameterValue(typologyDoc, 'style.fill_color', fillColor)
+      typologyDoc = @_mapTypology(typologyDoc) ? typologyDoc
+      Typologies.insert typologyDoc, (err, typeId) ->
+        if err
+          typeDf.reject(err)
+        else
+          typeDf.resolve(typeId)
+    typeDf.promise
 
   _mapEntity: (doc) -> doc
   _mapTypology: (doc) -> doc
