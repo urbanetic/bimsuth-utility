@@ -393,6 +393,8 @@ EntityUtils =
       ids = @_getChildrenFeatureIds(id)
       ids.push(id)
       PubSub.publish('entity/show', {ids: ids})
+      return true
+    return false
 
   hide: (id) ->
     return unless AtlasManager.getEntity(id)
@@ -400,6 +402,8 @@ EntityUtils =
       ids = @_getChildrenFeatureIds(id)
       ids.push(id)
       PubSub.publish('entity/hide', {ids: ids})
+      return true
+    return false
 
   _getChildrenFeatureIds: (id) ->
     entity = AtlasManager.getFeature(id)
