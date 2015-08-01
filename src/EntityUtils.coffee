@@ -397,7 +397,7 @@ EntityUtils =
     return false
 
   hide: (id) ->
-    return unless AtlasManager.getEntity(id)
+    return false unless AtlasManager.getEntity(id)
     if AtlasManager.hideEntity(id)
       ids = @_getChildrenFeatureIds(id)
       ids.push(id)
