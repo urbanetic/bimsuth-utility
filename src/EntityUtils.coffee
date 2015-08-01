@@ -555,24 +555,29 @@ if Meteor.isServer
 
   _.extend EntityUtils,
 
-    convertToKmz: (args) ->
-      Logger.info('Converting entities to KMZ', args)
+    _getProjectAndScenarioIdentifier: (args) ->
       args = @_getProjectAndScenarioArgs(args)
       projectId = args.projectId
       scenarioId = args.scenarioId
 
       scenarioStr = if scenarioId then '-' + scenarioId else ''
-      filePrefix = ProjectUtils.getDatedIdentifier(projectId) + scenarioStr
-      filename = filePrefix + '.kmz'
-      type = 'application/vnd.google-earth.kmz'
+      ProjectUtils.getDatedIdentifier(projectId) + scenarioStr
 
-      Logger.info('Generating C3ML entities...')
+    convertToC3ml: (args) ->
+      Logger.info('Generating C3ML entities...', args.projectId)
       c3mlData = Promises.runSync -> EntityUtils.getEntitiesAsJson(args)
       Logger.info('Wrote C3ML entities to', FileLogger.log(c3mlData))
       if c3mlData.c3mls.length == 0
         throw new Meteor.Error(500, 'No entities to convert')
-      buffer = AssetConversionService.export(c3mlData)
+      filename = @_getProjectAndScenarioIdentifier(args)
+      {filename: filename + '.c3ml.json', type: 'application/json', data: c3mlData}
 
+    convertToKmz: (args) ->
+      Logger.info('Converting entities to KMZ', args.projectId)
+      result = @convertToC3ml(args)
+      buffer = AssetConversionService.export(result.data)
+      filename = @_getProjectAndScenarioIdentifier(args) + '.kmz'
+      type = 'application/vnd.google-earth.kmz'
       if args.createFile
         file = new FS.File()
         file.name(filename)
