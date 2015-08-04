@@ -40,10 +40,11 @@ Package.onUse(function (api) {
     'Request'
   ], 'server');
   api.export([
-    'TaskRunner',
     'EntityImporter',
     'EntityUtils',
-    'ProjectUtils'
+    'ItemBuffer',
+    'ProjectUtils',
+    'TaskRunner'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -53,10 +54,11 @@ Package.onUse(function (api) {
     'src/Request.coffee'
   ], 'server');
   api.addFiles([
-    'src/TaskRunner.coffee',
+    'src/AccountsUtil.coffee',
     'src/EntityImporter.coffee',
     'src/EntityUtils.coffee',
+    'src/ItemBuffer.coffee',
     'src/ProjectUtils.coffee',
-    'src/AccountsUtil.coffee'
+    'src/TaskRunner.coffee',
   ], ['client', 'server']);
 });
