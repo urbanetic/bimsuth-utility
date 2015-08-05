@@ -64,7 +64,7 @@ ProjectUtils =
             newModelId = result
             idMap[oldModelId] = newModelId
             createDf.resolve(newModelId)
-      
+
     refDfs = []
     Q.all(createDfs).then(Meteor.bindEnvironment(
       ->
@@ -101,19 +101,43 @@ ProjectUtils =
     newName
 
   # @param {String} id - The ID of the project to duplicate.
-  # @param {Object} [args]
-  # @param {Function} [args.callback] - A callback which is passed the JSON documents from
-  #     {@link #toJson()} and returns the JSON which is then passed into {@link #fromJson()}.
+  # @param {String} userId - The ID of the user duplicating the project, who will be the new owner.
   # @returns {Object.<String, Object>} A map of collection names to maps of old IDs to new IDs for
   #     the models in that collection.
-  duplicate: (id, args) ->
-    Logger.info('Duplicating project', id, args)
-    json = @toJson(id)
-    if args?.callback?
-      json = args.callback(json) ? json
-    result = @fromJson(json)
-    Logger.info('Duplicated project', id)
-    result
+  duplicate: (id, userId) ->
+    Logger.info('Duplicating project', id)
+
+    project = Projects.findOne(id)
+    unless project then throw new Error('Project with ID ' + id + ' not found')
+
+    # Update some project properties for the new document.
+    delete project._id
+    project.properties.access.public = false
+    project.author = userId
+    project.dateModified = project.userModified = moment().toDate()
+    newProjectId = Projects.insert project
+
+    duplicates = {}
+    collections = _.without(CollectionUtils.getAll(), Projects)
+    _.each Collections.getMap(collections), (collection, name) ->
+      duplicates[name] = {}
+      # TODO(aramk) This will ignore collectionType references which don't have "projectId" fields.
+      originals = collection.findByProject?(id).fetch() ? []
+      if originals.length == 0
+        Logger.info "No #{name} docs to duplicate"
+        return
+
+      Logger.info "Duplicating #{originals.length} docs from #{name}..."
+      originals.forEach (doc) ->
+        if doc.projectId? then doc.projectId = newProjectId
+        originalId = doc._id
+        delete doc._id
+        # Assume existing documents are valid and skip cleaning and validation.
+        duplicates[name][originalId] = collection.direct.insert doc
+      Logger.info "Duplicated #{_.size duplicates[name]} docs from #{name}"
+
+    Logger.info "Duplicated project #{id} to new project #{newProjectId}"
+    duplicates
 
   downloadInBrowser: (id) ->
     Logger.info 'Exporting project', id
@@ -230,7 +254,7 @@ Meteor.startup ->
     'projects/duplicate': (id) ->
       userId = @userId
       ProjectUtils.assertAuthorization(id, userId)
-      Promises.runSync -> ProjectUtils.duplicate(id).then Meteor.bindEnvironment (idMaps) ->
+      Promises.runSync -> ProjectUtils.duplicate(id, userId).then Meteor.bindEnvironment (idMaps) ->
         newId = idMaps[Collections.getName(Projects)][id]
         Projects.update newId, $set: {dateModified: new Date, userModified: userId}
 
