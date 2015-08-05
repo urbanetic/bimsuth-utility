@@ -153,9 +153,11 @@ ProjectUtils =
       throw new Meteor.Error(500, 'No project specified when subscribing.')
     unless userId?
       throw new Meteor.Error(403, 'No user provided')
+    if Projects.isEnabled?(projectId) == false
+      throw new Meteor.Error(403, 'Project is disabled')
     unless (AccountsUtil.isOwner(Projects.findOne(projectId), userId) ||
         AccountsUtil.isAdmin(userId) ||
-        Projects.isPublic(projectId))
+        Projects.isPublic?(projectId))
       throw new Meteor.Error(403, 'User ' + userId +
           ' not authorized to view collections of project ' + projectId)
 
