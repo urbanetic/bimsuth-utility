@@ -28,13 +28,13 @@ ProjectUtils =
   # @param {Object} json - The serialized JSON. This object may be modified by this method - pass a
   #     clone if this is undesirable.
   # @param {Object} args
-  # TODO(aramk) Add support for this or remove the option.
-  # @param {Boolean} args.update - If true, no new models will be constructed. Instead, any existing
-  #     models matching with matching IDs will be updated with the values in the given JSON.
+  # @param {Boolean} [args.useDirect=true] - Whether collection methods should be invoked directly
+  #     and bypass any validation or collection hooks.
   # @returns {Promise.<Object.<String, Object>>} A promise to return a map of collection names to
   #     maps of old IDs to new IDs for the models in that collection.
   fromJson: (json, args) ->
     Logger.info('Creating project from JSON...')
+    args = Setter.defaults args, {useDirect: true}
 
     # Construct all models as new documents in the first pass, mapping old ID references to new IDs.
     # In the second pass, change all IDs to the new ones to maintain references in the new models.
@@ -61,7 +61,9 @@ ProjectUtils =
         # TODO(aramk) Disabling validation is dangerous - only done here to avoid validation
         # errors which don't have messages at the moment. Improve collection2 to provide the
         # message returned from the validate method.
-        collection.direct.insert model, (err, result) ->
+        method = collection.direct.insert if args.useDirect
+        method ?= collection.insert
+        method.call collection, model, (err, result) ->
           if err
             createDf.reject(err)
           else
@@ -76,13 +78,15 @@ ProjectUtils =
     allCreatePromise.then Meteor.bindEnvironment ->
       _.each idMaps, (idMap, name) ->
         collection = collectionMap[name]
+        method = collection.direct.update if args.useDirect
+        method ?= collection.update
         _.each idMap, (newId, oldId) ->
           newModel = collection.findOne(newId)
           modifier = SchemaUtils.getRefModifier(newModel, collection, idMaps)
           if Object.keys(modifier.$set).length > 0
             refDf = Q.defer()
             refDfs.push(refDf.promise)
-            collection.direct.update newId, modifier, (err, result) ->
+            method.call collection, newId, modifier, (err, result) ->
               if err
                 refDf.reject(err)
               else
@@ -118,8 +122,7 @@ ProjectUtils =
     json = @toJson(id)
     if args?.callback?
       json = args.callback(json) ? json
-    @fromJson(json).then (idMaps) ->
-      console.log 'idMaps', JSON.stringify(idMaps)
+    @fromJson(json, args).then (idMaps) ->
       newProjectId = idMaps[Collections.getName(Projects)]?[id]
       Logger.info('Duplicated project', id, 'to new project', newProjectId)
       return idMaps
