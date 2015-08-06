@@ -65,10 +65,6 @@ ProjectUtils =
             SchemaUtils.setParameterValue(model, 'access.public', false)
             user = AccountsUtil.resolveUser(args.userId)
             if user? then model[AccountsUtil.AUTHOR_FIELD] = user._id
-          
-          # if collection == Ranks
-          #   console.log('rank model', model)
-
           # Ensure collection hooks run for the project since there are far fewer docs.
           method = collection.direct.insert if args.useDirect
           method ?= collection.insert
@@ -93,17 +89,11 @@ ProjectUtils =
         newModelIds = _.values(idMap)
         newModels = collection.find(_id: $in: newModelIds).fetch()
         newModelsMap = {}
-
-        # if name == 'ranks'
-        #   console.log('idMap', idMap)
-
         _.each newModels, (model) -> newModelsMap[model._id] = model
         _.each idMap, (newId, oldId) ->
           runner.add ->
             newModel = newModelsMap[newId]
             modifier = SchemaUtils.getRefModifier(newModel, collection, idMaps)
-            # if name == 'ranks'
-            #   console.log('modifier', modifier)
             unless _.isEmpty(modifier.$set)
               refDf = Q.defer()
               refDfs.push(refDf.promise)
