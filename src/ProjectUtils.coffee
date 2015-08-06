@@ -30,6 +30,7 @@ ProjectUtils =
   # @param {Object} args
   # @param {Boolean} [args.useDirect=true] - Whether collection methods should be invoked directly
   #     and bypass any validation or collection hooks.
+  # @param {String} [args.userId] - The userId of the author for the new project.
   # @returns {Promise.<Object.<String, Object>>} A promise to return a map of collection names to
   #     maps of old IDs to new IDs for the models in that collection.
   fromJson: (json, args) ->
@@ -61,9 +62,14 @@ ProjectUtils =
           # is complete.
           if collection == Projects
             SchemaUtils.setParameterValue(model, 'access.enabled', false)
-          # TODO(aramk) Disabling validation is dangerous - only done here to avoid validation
-          # errors which don't have messages at the moment. Improve collection2 to provide the
-          # message returned from the validate method.
+            SchemaUtils.setParameterValue(model, 'access.public', false)
+            user = AccountsUtil.resolveUser(args.userId)
+            if user? then model[AccountsUtil.AUTHOR_FIELD] = user._id
+          
+          # if collection == Ranks
+          #   console.log('rank model', model)
+
+          # Ensure collection hooks run for the project since there are far fewer docs.
           method = collection.direct.insert if args.useDirect
           method ?= collection.insert
           method.call collection, model, (err, result) ->
@@ -87,12 +93,18 @@ ProjectUtils =
         newModelIds = _.values(idMap)
         newModels = collection.find(_id: $in: newModelIds).fetch()
         newModelsMap = {}
+
+        # if name == 'ranks'
+        #   console.log('idMap', idMap)
+
         _.each newModels, (model) -> newModelsMap[model._id] = model
         _.each idMap, (newId, oldId) ->
           runner.add ->
             newModel = newModelsMap[newId]
             modifier = SchemaUtils.getRefModifier(newModel, collection, idMaps)
-            if Object.keys(modifier.$set).length > 0
+            # if name == 'ranks'
+            #   console.log('modifier', modifier)
+            unless _.isEmpty(modifier.$set)
               refDf = Q.defer()
               refDfs.push(refDf.promise)
               method.call collection, newId, modifier, (err, result) ->
@@ -264,9 +276,10 @@ Meteor.startup ->
       @unblock()
       userId = @userId
       ProjectUtils.assertAuthorization(id, userId)
-      Promises.runSync -> ProjectUtils.duplicate(id).then Meteor.bindEnvironment (idMaps) ->
-        newId = idMaps[Collections.getName(Projects)][id]
-        Projects.update newId, $set: {dateModified: new Date, userModified: userId}
+      Promises.runSync ->
+        ProjectUtils.duplicate(id, {userId: userId}).then Meteor.bindEnvironment (idMaps) ->
+          newId = idMaps[Collections.getName(Projects)][id]
+          Projects.update newId, $set: {dateModified: new Date, userModified: userId}
       # Avoid serializing the output to the client.
       return undefined
 
