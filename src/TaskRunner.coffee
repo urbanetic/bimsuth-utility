@@ -52,6 +52,7 @@ class TaskRunner
     # Running on an empty queue will reset the promise so we need to store a refernece to the
     # promise in case it's removed.
     promise = @runDf.promise
+    # If buffer queue is empty, it will abort on the next runNext() call.
     if @bufferQueue.length == 0 then Logger.warn('No tasks added to runner - aborting')
     runNext()
     promise

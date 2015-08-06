@@ -43,8 +43,8 @@ Package.onUse(function (api) {
     'EntityImporter',
     'EntityUtils',
     'ItemBuffer',
-    'ProjectUtils',
-    'TaskRunner'
+    'TaskRunner',
+    'ProjectUtils'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -58,7 +58,7 @@ Package.onUse(function (api) {
     'src/EntityImporter.coffee',
     'src/EntityUtils.coffee',
     'src/ItemBuffer.coffee',
-    'src/ProjectUtils.coffee',
     'src/TaskRunner.coffee',
+    'src/ProjectUtils.coffee'
   ], ['client', 'server']);
 });

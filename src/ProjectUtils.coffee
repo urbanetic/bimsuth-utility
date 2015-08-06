@@ -34,7 +34,7 @@ ProjectUtils =
   #     maps of old IDs to new IDs for the models in that collection.
   fromJson: (json, args) ->
     Logger.info('Creating project from JSON...')
-    args = Setter.defaults args, {useDirect: true}
+    args = Setter.defaults args ? {}, {useDirect: true}
 
     # Construct all models as new documents in the first pass, mapping old ID references to new IDs.
     # In the second pass, change all IDs to the new ones to maintain references in the new models.
@@ -44,62 +44,81 @@ ProjectUtils =
     idMaps = {}
 
     Logger.info('Inserting duplicate docs...')
-    createDfs = []
+    runner = new TaskRunner()
     collectionMap = Collections.getMap(CollectionUtils.getAll())
     _.each collectionMap, (collection, name) ->
       idMap = idMaps[name] = {}
       _.each json[name], (model) ->
-        oldModelId = model._id
-        oldModel = collection.findOne(oldModelId)
-        # Ignore documents in the JSON which don't have a projectId and exist in the collection,
-        # indicating they should be shared between projects.
-        projectId = model[SchemaUtils.projectIdProperty]
-        return if collection != Projects && !projectId? && oldModel?
-        createDf = Q.defer()
-        createDfs.push(createDf.promise)
-        delete model._id
-        # TODO(aramk) Disabling validation is dangerous - only done here to avoid validation
-        # errors which don't have messages at the moment. Improve collection2 to provide the
-        # message returned from the validate method.
-        method = collection.direct.insert if args.useDirect
-        method ?= collection.insert
-        method.call collection, model, (err, result) ->
-          if err
-            createDf.reject(err)
-          else
-            newModelId = result
-            idMap[oldModelId] = newModelId
-            createDf.resolve(newModelId)
-      
-    Logger.info('Resolving references...')
-    refDfs = []
-    allCreatePromise = Q.all(createDfs)
-    allCreatePromise.fail(df.reject)
-    allCreatePromise.then Meteor.bindEnvironment ->
+        runner.add ->
+          oldModelId = model._id
+          # Ignore documents in the JSON which don't have a projectId and exist in the collection,
+          # indicating they should be shared between projects.
+          projectId = model[SchemaUtils.projectIdProperty]
+          return if collection != Projects && !projectId?
+          createDf = Q.defer()
+          delete model._id
+          # If inserting project models, disable them to prevent access until the duplication
+          # is complete.
+          if collection == Projects
+            SchemaUtils.setParameterValue(model, 'access.enabled', false)
+          # TODO(aramk) Disabling validation is dangerous - only done here to avoid validation
+          # errors which don't have messages at the moment. Improve collection2 to provide the
+          # message returned from the validate method.
+          method = collection.direct.insert if args.useDirect
+          method ?= collection.insert
+          method.call collection, model, (err, result) ->
+            if err
+              createDf.reject(err)
+            else
+              newModelId = result
+              idMap[oldModelId] = newModelId
+              createDf.resolve(newModelId)
+          createDf.promise
+
+    insertsPromise = runner.run()
+    insertsPromise.fail(df.reject)
+    insertsPromise.then Meteor.bindEnvironment ->
+      Logger.info('Resolving references...')
+      refDfs = []
       _.each idMaps, (idMap, name) ->
         collection = collectionMap[name]
         method = collection.direct.update if args.useDirect
         method ?= collection.update
+        newModelIds = _.values(idMap)
+        newModels = collection.find(_id: $in: newModelIds).fetch()
+        newModelsMap = {}
+        _.each newModels, (model) -> newModelsMap[model._id] = model
         _.each idMap, (newId, oldId) ->
-          newModel = collection.findOne(newId)
-          modifier = SchemaUtils.getRefModifier(newModel, collection, idMaps)
-          if Object.keys(modifier.$set).length > 0
-            refDf = Q.defer()
-            refDfs.push(refDf.promise)
-            method.call collection, newId, modifier, (err, result) ->
-              if err
-                refDf.reject(err)
-              else
-                refDf.resolve(newId)
-      Q.all(refDfs).then(
-        ->
+          runner.add ->
+            newModel = newModelsMap[newId]
+            modifier = SchemaUtils.getRefModifier(newModel, collection, idMaps)
+            if Object.keys(modifier.$set).length > 0
+              refDf = Q.defer()
+              refDfs.push(refDf.promise)
+              method.call collection, newId, modifier, (err, result) ->
+                if err
+                  refDf.reject(err)
+                else
+                  refDf.resolve(newId)
+              refDf.promise
+
+      updatesPromise = runner.run()
+      updatesPromise.fail Meteor.bindEnvironment (err) ->
+        # TODO(aramk) Remove added models on failure.
+        Logger.error('Project creation from JSON failed', err)
+        df.reject(err)
+      updatesPromise.then Meteor.bindEnvironment ->
+        Logger.info('Enabling projects...')
+        projectIds = _.values idMaps[Collections.getName(Projects)]
+        modifier = {$set: {}}
+        modifier.$set["#{ParamUtils.prefix}.access.enabled"] = true
+        _.each projectIds, (projectId) -> runner.add ->
+          projectDf = Q.defer()
+          Projects.update projectId, modifier, Promises.toCallback(projectDf)
+          projectDf.promise
+        runner.run().fin ->
           Logger.info('Project creation from JSON succeeded')
           df.resolve(idMaps)
-        (err) ->
-          # TODO(aramk) Remove added models on failure.
-          Logger.error('Project creation from JSON failed', err)
-          df.reject(err)
-      )
     df.promise
 
   # @params {String} name
@@ -242,11 +261,14 @@ Meteor.startup ->
 
   Meteor.methods
     'projects/duplicate': (id) ->
+      @unblock()
       userId = @userId
       ProjectUtils.assertAuthorization(id, userId)
       Promises.runSync -> ProjectUtils.duplicate(id).then Meteor.bindEnvironment (idMaps) ->
         newId = idMaps[Collections.getName(Projects)][id]
         Projects.update newId, $set: {dateModified: new Date, userModified: userId}
+      # Avoid serializing the output to the client.
+      return undefined
 
   ##################################################################################################
   # REMOVAL
