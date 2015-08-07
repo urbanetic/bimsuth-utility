@@ -1,24 +1,32 @@
 class ItemBuffer
 
   constructor: (args) ->
-    @_size = args.size
-    unless Numbers.isDefined(@_size) then throw new Error('Must provide size')
-    if @_size <= 0 then throw new Error('Size must be > 0')
+    @_maxSize = args.size
+    unless Numbers.isDefined(@_maxSize) then throw new Error('Must provide size')
+    if @_maxSize <= 0 then throw new Error('Size must be > 0')
     @_reset()
+    @_waitCallbacks = []
 
-  add: (item) ->
-    @_buffer.push(item)
-    if @_buffer.length >= @_size then @flush()
+  add: (id, item) ->
+    if @_buffer[id]? then Logger.warn('Replacing ItemBuffer item', id, @_buffer[id], item)
+    @_buffer[id] = item
+    @_size++
+    if @_size >= @_maxSize then @flush()
 
-  getItems: -> _.toArray(@_buffer)
+  remove: (id) ->
+    return unless @_buffer[id]?
+    delete @_buffer[id]
+    @_size--
+
+  getItems: -> _.clone(@_buffer)
 
   flush: ->
     _.each @_waitCallbacks, (callback) => callback(@getItems())
-    @_buffer = []
+    @_reset()
 
   _reset: ->
-    @_buffer = []
-    @_waitCallbacks = []
+    @_size = 0
+    @_buffer = {}
 
   wait: (callback) ->
     unless Types.isFunction(callback) then throw new Error('Must provide callback')
