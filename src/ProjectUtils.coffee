@@ -226,7 +226,7 @@ ProjectUtils =
     AccountsUtil.isOwnerOrAdmin(project, userId)
 
 Meteor.startup ->
-  return unless Meteor.isServer
+  return unless Meteor.isServer and Projects?
 
   ##################################################################################################
   # PROJECT DATE
