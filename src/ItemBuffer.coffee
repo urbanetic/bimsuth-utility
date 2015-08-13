@@ -9,9 +9,9 @@ class ItemBuffer
 
   add: (id, item) ->
     if @_buffer[id]? then Logger.warn('Replacing ItemBuffer item', id, @_buffer[id], item)
+    if @_size + 1 > @_maxSize then @flush()
     @_buffer[id] = item
     @_size++
-    if @_size >= @_maxSize then @flush()
 
   remove: (id) ->
     return unless @_buffer[id]?
