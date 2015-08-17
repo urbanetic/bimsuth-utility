@@ -500,7 +500,15 @@ EntityUtils =
       if err then throw err
       if fileId
         Logger.info('Download entities as KMZ with file ID', fileId)
-        Files.downloadInBrowser(fileId)
+        # Wait for the file to be synced to the client.
+        handle = null
+        handler = ->
+          file = Files.findOne(fileId)
+          if file
+            clearInterval(handle)
+            Files.downloadInBrowser(fileId)
+        handle = setInterval handler, 1000
+        handler()
       else
         Logger.error('Could not download entities.')
 
