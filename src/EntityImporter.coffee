@@ -69,7 +69,7 @@ EntityImporter =
     if Meteor.isServer then FileLogger.log(args)
 
     limit = args.limit
-    if limit
+    if limit?
       c3mls = c3mls.slice(0, limit)
       Logger.info 'Limited to', limit, 'entities'
 
