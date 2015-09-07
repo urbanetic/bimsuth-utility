@@ -158,6 +158,11 @@ EntityImporter =
         id = c3ml.id
         unless sortMap[id] then sortedIds.push(id)
 
+      counterLog = new CounterLog
+        label: 'Importing entities'
+        total: sortedIds.length
+        bufferSize: 100
+
       runner.run()
       geometryPromises = Q.all(_.values(geomDfMap))
       geometryPromises.fail(df.reject)
@@ -208,6 +213,7 @@ EntityImporter =
                   inputs: inputs
                   converter: converter
                   childrenNameMap: childrenNameMap
+                  counterLog: counterLog
                 }, args)
 
                 parentId = c3ml.parentId
@@ -428,6 +434,7 @@ EntityImporter =
           modelDf.resolve(insertId)
       
       Entities.insert model, callback
+      args.counterLog.increment()
     
     modelDf.promise
 

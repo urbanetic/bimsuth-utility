@@ -41,6 +41,7 @@ Package.onUse(function (api) {
     'Request'
   ], 'server');
   api.export([
+    'CounterLog',
     'EntityImporter',
     'EntityUtils',
     'ItemBuffer',
@@ -56,6 +57,7 @@ Package.onUse(function (api) {
   ], 'server');
   api.addFiles([
     'src/AccountsUtil.coffee',
+    'src/CounterLog.coffee',
     'src/EntityImporter.coffee',
     'src/EntityUtils.coffee',
     'src/ItemBuffer.coffee',
