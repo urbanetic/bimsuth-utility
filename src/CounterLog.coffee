@@ -7,7 +7,7 @@ class CounterLog
       label: 'Counter log'
     , args
     @total = @options.total
-    unless Types.isNumber(@total) and @total > 0 then throw new Error('Invalid total: ' + @total)
+    unless Types.isNumber(@total) and @total >= 0 then throw new Error('Invalid total: ' + @total)
     @value = @options.value
     unless Types.isNumber(@value) then throw new Error('Invalid value: ' + @value)
     @log()

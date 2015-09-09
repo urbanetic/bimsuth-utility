@@ -90,7 +90,6 @@ EntityImporter =
       modelDfs.push(layerPromise)
     else
       runner = new TaskRunner()
-      insertedCount = 0
       # A map of type names to deferred promises for creating them. Used to prevent a race condition
       # if we try to create the types with two entities. In this case, the second request should use
       # the existing type promise.
@@ -116,18 +115,6 @@ EntityImporter =
       childrenNameMap = {}
 
       Logger.info('Inserting ' + c3mls.length + ' c3mls...')
-
-      insertedCount = 0
-      incrementC3mlCount = ->
-        insertedCount++
-        if insertedCount % 100 == 0 || insertedCount == c3mls.length
-          Logger.debug('Inserted ' + insertedCount + '/' + c3mls.length + ' entities')
-
-      geometryCount = 0
-      incrementGeometryCount = ->
-        geometryCount++
-        if geometryCount % 100 == 0 || geometryCount == c3mls.length
-          Logger.debug('Parsed ' + geometryCount + '/' + c3mls.length + ' geometries')
 
       _.each c3mls, (c3ml, i) =>
         if args.forEachC3ml
@@ -221,7 +208,6 @@ EntityImporter =
                   missingParentsIdMap[parentId] = true
 
                 createEntity = => @_createEntityFromAsset.call(@, createEntityArgs)
-                modelDf.promise.then(incrementC3mlCount)
 
                 if typeName
                   typeArgs =
