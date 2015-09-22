@@ -13,11 +13,12 @@ class CounterLog
     @log()
 
   increment: (amount = 1) ->
+    nextBoundary = @options.bufferSize - (@value % @options.bufferSize) + @value
     @value += amount
     if @value >= @total
       @value == @total
       @log()
-    else if @value % @options.bufferSize == 0
+    else if @value >= nextBoundary
       @log()
 
   log: -> Logger.info("#{@options.label}: #{@value}/#{@total}")    
