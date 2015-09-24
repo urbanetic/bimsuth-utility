@@ -235,9 +235,9 @@ Meteor.startup ->
   # Updating project or models in the project will update the modified date of a project.
 
   getCurrentDate = -> moment().toDate()
-  updateProjectModifiedDate = _.throttle Meteor.bindEnvironment (projectId, userId) ->
+  updateProjectModifiedDate = Meteor.bindEnvironment (projectId, userId) ->
     Projects.update projectId, $set: {dateModified: getCurrentDate(), userModified: userId}
-  , 5000
+    updateProjectModifiedDate = _.throttle(updateProjectModifiedDate, 5000)
 
   Projects.before.insert (userId, doc) ->
     unless doc.dateModified
