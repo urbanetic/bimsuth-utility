@@ -237,7 +237,7 @@ Meteor.startup ->
   getCurrentDate = -> moment().toDate()
   updateProjectModifiedDate = Meteor.bindEnvironment (projectId, userId) ->
     Projects.update projectId, $set: {dateModified: getCurrentDate(), userModified: userId}
-    updateProjectModifiedDate = _.throttle(updateProjectModifiedDate, 5000)
+  updateProjectModifiedDate = _.throttle(updateProjectModifiedDate, 5000)
 
   Projects.before.insert (userId, doc) ->
     unless doc.dateModified
