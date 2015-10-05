@@ -227,10 +227,17 @@ EntityImporter =
 
     modelsPromise = Q.all(modelDfs)
     modelsPromise.fail(df.reject)
-    modelsPromise.then Meteor.bindEnvironment ->
+    modelsPromise.then Meteor.bindEnvironment (models) ->
+      modelMap = {}
+      # modelIds also includes null values for entities which were skipped and not inserted.
+      models = _.filter models, (model) -> model?
+      importCount = 0
+      _.each models, (model) ->
+        modelMap[model._id] = model
+        importCount++
+
       requirejs ['atlas/model/GeoPoint'], Meteor.bindEnvironment (GeoPoint) ->
-        importCount = modelDfs.length
-        resolve = -> df.resolve(importCount)
+        resolve = -> df.resolve(modelMap)
         Logger.info 'Imported ' + importCount + ' entities'
         missingParentIds = _.keys missingParentsIdMap
         if missingParentIds.length > 0
@@ -403,6 +410,8 @@ EntityImporter =
       model = @_mapEntity(model, args) ? model
       if args.forEachEntity
         model = args.forEachEntity.call(EntityImporter, {entity: model, c3ml: c3ml}) ? model
+        if model == false
+          return modelDf.resolve(null)
 
       callback = (err, insertId) ->
         if err
@@ -417,7 +426,8 @@ EntityImporter =
             Logger.error('Failed to log entity insert failure', e)
           modelDf.reject(err)
         else
-          modelDf.resolve(insertId)
+          model._id = insertId
+          modelDf.resolve(model)
       
       Entities.insert model, callback
       args.counterLog.increment()
@@ -495,7 +505,9 @@ if Meteor.isServer
         df.promise.fin -> delete importRequestMap[importId]
         Logger.info 'Import request started', importId
       Promises.runSync ->
-        promise = EntityImporter.fromAsset(args)
+        promise = EntityImporter.fromAsset(args).then (modelMap) ->
+          # Return just a count of the number of imported models.
+          _.size(modelMap)
         if df?
           df.resolve(promise)
           # Cancelling the import should return the import method.
