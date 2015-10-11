@@ -33,7 +33,7 @@ class TaskRunner
         runsTime += timeDiff
         if runsTime >= @options.runDuration
           Logger.debug('Task runner ran for', runsTime, 'ms')
-          @_wait()
+          @wait()
           lastTaskIsWait = true
           runsTime = 0
       else
@@ -57,17 +57,17 @@ class TaskRunner
     runNext()
     promise
 
-  _wait: ->
-    waitDuration = @options.waitDuration
+  wait: (duration) ->
+    duration ?= @options.waitDuration
     Logger.debug('Task runner ready to wait...')
     wait = =>
-      Logger.debug('Task runner waiting for ' + waitDuration + 'ms...')
+      Logger.debug('Task runner waiting for ' + duration + 'ms...')
       @status = 'waiting'
       @waitDf = Q.defer()
       onDone = Meteor.bindEnvironment =>
         @waitDf.resolve()
         @status = 'running'
-      setTimeout(onDone, waitDuration)
+      Meteor.setTimeout(onDone, duration)
       @waitDf.promise
     @bufferQueue.unshift(wait)
 
