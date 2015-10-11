@@ -17,10 +17,10 @@ Package.onUse(function (api) {
     'coffeescript',
     'underscore',
     'aramk:q@1.0.1_1',
-    'aramk:utility@0.8.6',
     'reactive-var@1.0.5',
     'urbanetic:accounts-ui@0.2.2',
-    'urbanetic:bismuth-schema-utility@0.1.0'
+    'urbanetic:bismuth-schema-utility@0.1.0',
+    'urbanetic:utility@1.0.1'
   ], ['client', 'server']);
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
