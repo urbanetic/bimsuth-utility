@@ -22,14 +22,12 @@ class TaskRunner
     @status = 'running'
 
     # NOTE: Uses system time instead of timers to prevent locking up during synchronous tasks.
-    startTime = null
     runsTime = 0
     lastTaskIsWait = false
     runNext = Meteor.bindEnvironment =>
-
-      if startTime? && !lastTaskIsWait
+      if @startTime? && !lastTaskIsWait
         currentTime = new Date().getTime()
-        timeDiff = currentTime - startTime
+        timeDiff = currentTime - @startTime
         runsTime += timeDiff
         if runsTime >= @options.runDuration
           Logger.debug('Task runner ran for', runsTime, 'ms')
@@ -44,7 +42,7 @@ class TaskRunner
         @reset()
         return
       callback = @bufferQueue.shift()
-      startTime = new Date().getTime()
+      @_setStartTime()
       @runQueue.add(callback).fin =>
         # Prevent running the next task if the runner was paused or reset.
         if @status == 'running' then runNext()
@@ -67,6 +65,7 @@ class TaskRunner
       onDone = Meteor.bindEnvironment =>
         @waitDf.resolve()
         @status = 'running'
+        @_setStartTime()
       Meteor.setTimeout(onDone, duration)
       @waitDf.promise
     @bufferQueue.unshift(wait)
@@ -83,6 +82,8 @@ class TaskRunner
       @status = 'paused'
       @pauseDf.promise
     @bufferQueue.unshift(pause)
+
+  _setStartTime: -> @startTime = new Date().getTime()
 
   reset: ->
     Logger.debug('Resetting task runner')

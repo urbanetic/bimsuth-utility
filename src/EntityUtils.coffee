@@ -1,3 +1,5 @@
+return unless Package['urbanetic:atlas-util']?
+
 EntityUtils =
 
   _footprintProperty: 'space.geom_2d'
