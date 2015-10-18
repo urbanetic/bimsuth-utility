@@ -19,12 +19,12 @@ Package.onUse(function (api) {
     'aramk:q@1.0.1_1',
     'aramk:utility@0.8.6',
     'reactive-var@1.0.5',
-    'urbanetic:atlas-util@0.3.0',
     'urbanetic:accounts-ui@0.2.2',
     'urbanetic:bismuth-schema-utility@0.1.0'
   ], ['client', 'server']);
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
+    'urbanetic:atlas-util@0.3.0'
   ], ['client', 'server'], {weak: true});
   api.use([
     'jquery',
