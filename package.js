@@ -1,7 +1,7 @@
 // Meteor package definition.
 Package.describe({
   name: 'urbanetic:bismuth-utility',
-  version: '0.2.0',
+  version: '0.2.1',
   summary: 'A set of utilities for working with GIS apps.',
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });

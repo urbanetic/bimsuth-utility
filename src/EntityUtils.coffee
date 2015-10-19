@@ -517,41 +517,43 @@ EntityUtils =
   getConverter: -> converter
 
 converter = null
-converterPromise = AtlasConverter.getInstance()
-converterPromise.then (Meteor.bindEnvironment (_converter) => converter = _converter)
-    , Meteor.bindEnvironment (err) -> Logger.error('Could not set up AtlasConverter', err)
 
-Meteor.startup -> EntityUtils.reset()
+Meteor.startup ->
+  EntityUtils.reset()
 
-WKT.getWKT Meteor.bindEnvironment (wkt) ->
-  # Uses _.defaults to prevent a race condition caused if another package redefines these methods.
-  _.defaults EntityUtils,
+  converterPromise = AtlasConverter.getInstance()
+  converterPromise.then (Meteor.bindEnvironment (_converter) => converter = _converter)
+      , Meteor.bindEnvironment (err) -> Logger.error('Could not set up AtlasConverter', err)
 
-    getFormType2d: (id) ->
-      model = @_getModel(id)
-      space = model.parameters.space
-      geom_2d = space?.geom_2d
-      # Entities which have line or point geometries cannot have extrusion or mesh display modes.
-      if wkt.isPolygon(geom_2d)
-        'polygon'
-      else if wkt.isLine(geom_2d)
-        'line'
-      else if wkt.isPoint(geom_2d)
-        'point'
-      else
-        null
+  WKT.getWKT Meteor.bindEnvironment (wkt) ->
+    # Uses _.defaults to prevent a race condition caused if another package redefines these methods.
+    _.defaults EntityUtils,
 
-    getDisplayMode: (id) ->
-      formType2d = @getFormType2d(id)
-      if formType2d? && formType2d != 'polygon'
-        # When rendering lines and points, ensure the display mode is consistent. With polygons,
-        # they are only enabled if the display mode session variable specifies it.
-        formType2d
-      else if Meteor.isClient
-        Session.get(@displayModeSessionVariable)
-      else
-        # Server-side cannot display anything.
-        null
+      getFormType2d: (id) ->
+        model = @_getModel(id)
+        space = model.parameters.space
+        geom_2d = space?.geom_2d
+        # Entities which have line or point geometries cannot have extrusion or mesh display modes.
+        if wkt.isPolygon(geom_2d)
+          'polygon'
+        else if wkt.isLine(geom_2d)
+          'line'
+        else if wkt.isPoint(geom_2d)
+          'point'
+        else
+          null
+
+      getDisplayMode: (id) ->
+        formType2d = @getFormType2d(id)
+        if formType2d? && formType2d != 'polygon'
+          # When rendering lines and points, ensure the display mode is consistent. With polygons,
+          # they are only enabled if the display mode session variable specifies it.
+          formType2d
+        else if Meteor.isClient
+          Session.get(@displayModeSessionVariable)
+        else
+          # Server-side cannot display anything.
+          null
 
 if Meteor.isServer
 
