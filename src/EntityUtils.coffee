@@ -420,8 +420,8 @@ EntityUtils =
     entityIds = AtlasManager.getSelectedEntityIds()
     # Filter GeoEntity objects which are not project entities.
     entityIds = _.filter entityIds, (id) -> Collections.hasDoc(Entities, id)
-    # Simplify the IDs by resolve children of collections and removing them from the results.
-    if options?.resolveCollections
+    # Simplify the IDs by resolving children of collections and removing them from the results.
+    unless options?.resolveCollections == false
       entityIdMap = {}
       _.each entityIds, (id) -> entityIdMap[id] = true
       _.each entityIds, (id) ->
