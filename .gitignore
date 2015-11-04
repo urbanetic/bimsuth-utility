@@ -1,6 +1,6 @@
 .build*
 *.sublime-workspace
-*.npm
+.npm
 
 *.lock
 *.swp

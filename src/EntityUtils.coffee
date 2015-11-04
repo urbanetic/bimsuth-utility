@@ -1,3 +1,5 @@
+return unless Package['urbanetic:atlas-util']?
+
 EntityUtils =
 
   _footprintProperty: 'space.geom_2d'
@@ -11,35 +13,31 @@ EntityUtils =
     type = Typologies.findOne(typeId)
     typeFillColor = type && SchemaUtils.getParameterValue(type, 'style.fill_color')
     typeBorderColor = type && SchemaUtils.getParameterValue(type, 'style.border_color')
-    AtlasConverter.getInstance().then(
-      Meteor.bindEnvironment (converter) =>
-        style = entity.parameters.style
-        fill_color = style?.fill_color ? typeFillColor ? '#eee'
-        border_color = style?.border_color ? typeBorderColor
-        if fill_color and !border_color
-          border_color = Colors.darken(fill_color)
-        space = entity.parameters.space ? {}
-        geom_2d = @_getFootprint(entity)
-        unless geom_2d
-          geom_2d = null
-          # throw new Error('No 2D geometry - cannot render entity with ID ' + id)
-        displayMode = args?.displayMode ? @getDisplayMode(id)
-        args = Setter.merge({
-          id: id
-          vertices: geom_2d
-          elevation: space.elevation
-          displayMode: displayMode
-          style:
-            fillColor: fill_color
-            borderColor: border_color
-        }, args)
-        height = space.height
-        if height?
-          args.height = height
-        df.resolve converter.toGeoEntityArgs(args)
-      df.reject
-    )
-    df.promise
+    converter = @getConverter()
+    style = entity.parameters.style
+    fill_color = style?.fill_color ? typeFillColor ? '#eee'
+    border_color = style?.border_color ? typeBorderColor
+    if fill_color and !border_color
+      border_color = Colors.darken(fill_color)
+    space = entity.parameters.space ? {}
+    geom_2d = @_getFootprint(entity)
+    unless geom_2d
+      geom_2d = null
+      # throw new Error('No 2D geometry - cannot render entity with ID ' + id)
+    displayMode = args?.displayMode ? @getDisplayMode(id)
+    args = Setter.merge({
+      id: id
+      vertices: geom_2d
+      elevation: space.elevation
+      displayMode: displayMode
+      style:
+        fillColor: fill_color
+        borderColor: border_color
+    }, args)
+    height = space.height
+    if height?
+      args.height = height
+    converter.toGeoEntityArgs(args)
 
   toC3mlArgs: (id) ->
     entity = @_getModel(id)
@@ -85,9 +83,9 @@ EntityUtils =
       isWKT = wkt.isWKT(footprint)
       if isWKT
         # Hidden by default since we change the display mode to toggle visibility.
-        @toGeoEntityArgs(id, {show: false}).then Meteor.bindEnvironment (entityArgs) =>
-          geoEntity = AtlasManager.renderEntity(entityArgs)
-          df.resolve(geoEntity)
+        entityArgs = @toGeoEntityArgs(id, {show: false})
+        geoEntity = AtlasManager.renderEntity(entityArgs)
+        df.resolve(geoEntity)
       else
         df.resolve @_buildGeometryFromFile(id, @_footprintProperty)
     df.promise
@@ -149,46 +147,42 @@ EntityUtils =
       # themselves to the parent.
       df.resolve(AtlasManager.createCollection(id, {children: []}))
     else
-      requirejs ['atlas/model/Feature'], Meteor.bindEnvironment (Feature) =>
-        WKT.getWKT Meteor.bindEnvironment (wkt) =>
-          isWKT = wkt.isWKT(geom_2d)
-          Q.all([@_render2dGeometry(id), @_render3dGeometry(id)]).then(
-            Meteor.bindEnvironment (geometries) =>
-              entity2d = geometries[0]
-              entity3d = geometries[1]
-              unless entity2d || entity3d
-                df.resolve(null)
-                return
+      WKT.getWKT Meteor.bindEnvironment (wkt) =>
+        isWKT = wkt.isWKT(geom_2d)
+        Q.all([@_render2dGeometry(id), @_render3dGeometry(id)]).then(
+          Meteor.bindEnvironment (geometries) =>
+            entity2d = geometries[0]
+            entity3d = geometries[1]
+            unless entity2d || entity3d
+              df.resolve(null)
+              return
 
-              # This feature will be used for rendering the 2d geometry as the
-              # footprint/extrusion and the 3d geometry as the mesh.
-              geoEntityDf = Q.defer()
-              if isWKT
-                geoEntityDf.resolve(entity2d)
-              else
-                # If we construct the 2d geometry from a collection of entities rather than
-                # WKT, the geometry is a collection rather than a feature. Create a new
-                # feature to store both 2d and 3d geometries.
-                @toGeoEntityArgs(id, {vertices: null}).then(
-                  Meteor.bindEnvironment (args) ->
-                    geoEntity = AtlasManager.renderEntity(args)
-                    addedGeometry.push(geoEntity)
-                    if entity2d
-                      geoEntity.setForm(Feature.DisplayMode.FOOTPRINT, entity2d)
-                      args.height? && entity2d.setHeight(args.height)
-                      args.elevation? && entity2d.setElevation(args.elevation)
-                    geoEntityDf.resolve(geoEntity)
-                  geoEntityDf.reject
-                )
-              geoEntityDf.promise.then(
-                Meteor.bindEnvironment (geoEntity) =>
-                  if entity3d
-                    geoEntity.setForm(Feature.DisplayMode.MESH, entity3d)
-                  df.resolve(geoEntity)
-                df.reject
-              )
-            df.reject
-          )
+            # This feature will be used for rendering the 2d geometry as the
+            # footprint/extrusion and the 3d geometry as the mesh.
+            geoEntityDf = Q.defer()
+            if isWKT
+              geoEntityDf.resolve(entity2d)
+            else
+              # If we construct the 2d geometry from a collection of entities rather than
+              # WKT, the geometry is a collection rather than a feature. Create a new
+              # feature to store both 2d and 3d geometries.
+              args = @toGeoEntityArgs(id, {vertices: null})
+              geoEntity = AtlasManager.renderEntity(args)
+              addedGeometry.push(geoEntity)
+              if entity2d
+                geoEntity.setForm(Atlas.Feature.DisplayMode.FOOTPRINT, entity2d)
+                args.height? && entity2d.setHeight(args.height)
+                args.elevation? && entity2d.setElevation(args.elevation)
+              geoEntityDf.resolve(geoEntity)
+            geoEntityDf.promise.then(
+              Meteor.bindEnvironment (geoEntity) =>
+                if entity3d
+                  geoEntity.setForm(Atlas.Feature.DisplayMode.MESH, entity3d)
+                df.resolve(geoEntity)
+              df.reject
+            )
+          df.reject
+        )
     df.promise.then Meteor.bindEnvironment (geoEntity) =>
       return unless geoEntity
       # TODO(aramk) Rendering the parent as a special case with children doesn't affect the
@@ -384,16 +378,9 @@ EntityUtils =
   _getZoomableEntities: -> Entities.findByProject().map (entity) -> entity._id
 
   _renderEntity: (id, args) ->
-    df = Q.defer()
-    @toGeoEntityArgs(id, args).then(
-      Meteor.bindEnvironment (entityArgs) ->
-        unless entityArgs
-          console.error('Cannot render - no entityArgs')
-          return
-        df.resolve(AtlasManager.renderEntity(entityArgs))
-      df.reject
-    )
-    df.promise
+    entityArgs = @toGeoEntityArgs(id, args)
+    unless entityArgs then return Q.reject('Cannot render - no entityArgs')
+    AtlasManager.renderEntity(entityArgs)
 
   unrender: (id) ->
     df = Q.defer()
@@ -407,13 +394,17 @@ EntityUtils =
       ids = @_getChildrenFeatureIds(id)
       ids.push(id)
       PubSub.publish('entity/show', {ids: ids})
+      return true
+    return false
 
   hide: (id) ->
-    return unless AtlasManager.getEntity(id)
+    return false unless AtlasManager.getEntity(id)
     if AtlasManager.hideEntity(id)
       ids = @_getChildrenFeatureIds(id)
       ids.push(id)
       PubSub.publish('entity/hide', {ids: ids})
+      return true
+    return false
 
   _getChildrenFeatureIds: (id) ->
     entity = AtlasManager.getFeature(id)
@@ -424,11 +415,21 @@ EntityUtils =
       if child then childIds.push(childId)
     childIds
 
-  getSelectedIds: ->
+  getSelectedIds: (options) ->
     # Use the selected entities, or all entities in the project.
-    entityIds = AtlasManager.getSelectedFeatureIds()
+    entityIds = AtlasManager.getSelectedEntityIds()
     # Filter GeoEntity objects which are not project entities.
-    _.filter entityIds, (id) -> Entities.findOne(id)
+    entityIds = _.filter entityIds, (id) -> Collections.hasDoc(Entities, id)
+    # Simplify the IDs by resolving children of collections and removing them from the results.
+    unless options?.resolveCollections == false
+      entityIdMap = {}
+      _.each entityIds, (id) -> entityIdMap[id] = true
+      _.each entityIds, (id) ->
+        geoEntity = AtlasManager.getEntity(id)
+        _.each geoEntity?.getRecursiveChildren?(), (child) ->
+          delete entityIdMap[AtlasIdMap.getAppId(child.getId())]
+      entityIds = _.keys(entityIdMap)
+    entityIds
 
   _getModel: (id) -> Entities.findOne(id)
 
@@ -438,7 +439,7 @@ EntityUtils =
     scenarioId = args.scenarioId
     df = Q.defer()
     entities = @_getEntitiesForJson(args)
-    ids = args.ids = _.map entities, (entity) -> entity._id
+    ids = args.ids = _.pluck entities, '_id'
     unrenderPromises = @_unrenderEntitiesBeforeJson(ids: ids)
     Q.all(unrenderPromises).then Meteor.bindEnvironment =>
       renderPromise = @_renderEntitiesBeforeJson(args)
@@ -530,37 +531,46 @@ EntityUtils =
     @renderingEnabledDf.resolve()
     @prevRenderingEnabledDf = null
 
-Meteor.startup -> EntityUtils.reset()
+  getConverter: -> converter
 
-WKT.getWKT Meteor.bindEnvironment (wkt) ->
-  # Uses _.defaults to prevent a race condition caused if another package redefines these methods.
-  _.defaults EntityUtils,
+converter = null
 
-    getFormType2d: (id) ->
-      model = @_getModel(id)
-      space = model.parameters.space
-      geom_2d = space?.geom_2d
-      # Entities which have line or point geometries cannot have extrusion or mesh display modes.
-      if wkt.isPolygon(geom_2d)
-        'polygon'
-      else if wkt.isLine(geom_2d)
-        'line'
-      else if wkt.isPoint(geom_2d)
-        'point'
-      else
-        null
+Meteor.startup ->
+  EntityUtils.reset()
 
-    getDisplayMode: (id) ->
-      formType2d = @getFormType2d(id)
-      if formType2d? && formType2d != 'polygon'
-        # When rendering lines and points, ensure the display mode is consistent. With polygons,
-        # they are only enabled if the display mode session variable specifies it.
-        formType2d
-      else if Meteor.isClient
-        Session.get(@displayModeSessionVariable)
-      else
-        # Server-side cannot display anything.
-        null
+  converterPromise = AtlasConverter.getInstance()
+  converterPromise.then (Meteor.bindEnvironment (_converter) => converter = _converter)
+      , Meteor.bindEnvironment (err) -> Logger.error('Could not set up AtlasConverter', err)
+
+  WKT.getWKT Meteor.bindEnvironment (wkt) ->
+    # Uses _.defaults to prevent a race condition caused if another package redefines these methods.
+    _.defaults EntityUtils,
+
+      getFormType2d: (id) ->
+        model = @_getModel(id)
+        space = model.parameters.space
+        geom_2d = space?.geom_2d
+        # Entities which have line or point geometries cannot have extrusion or mesh display modes.
+        if wkt.isPolygon(geom_2d)
+          'polygon'
+        else if wkt.isLine(geom_2d)
+          'line'
+        else if wkt.isPoint(geom_2d)
+          'point'
+        else
+          null
+
+      getDisplayMode: (id) ->
+        formType2d = @getFormType2d(id)
+        if formType2d? && formType2d != 'polygon'
+          # When rendering lines and points, ensure the display mode is consistent. With polygons,
+          # they are only enabled if the display mode session variable specifies it.
+          formType2d
+        else if Meteor.isClient
+          Session.get(@displayModeSessionVariable)
+        else
+          # Server-side cannot display anything.
+          null
 
 if Meteor.isServer
 
@@ -605,3 +615,10 @@ if Meteor.isServer
     'entities/to/kmz': (args) ->
       @unblock()
       EntityUtils.convertToKmz(args)
+
+# RequireJS modules
+Atlas = {}
+requirejs [
+  'atlas/model/Feature'
+], (Feature) ->
+  Atlas.Feature = Feature

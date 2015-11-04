@@ -63,15 +63,15 @@ EntityImporter =
     return if isImportCancelled(importId)
     c3mls = args.c3mls
     unless Types.isArray(c3mls)
-      return Q.reject('C3ML not defined as an array.')
+      return Q.reject('"c3mls" must be an array.')
 
     Logger.info 'Importing entities from', c3mls.length, 'c3mls...'
     if Meteor.isServer then FileLogger.log(args)
 
     limit = args.limit
-    if limit
+    if limit?
       c3mls = c3mls.slice(0, limit)
-      Logger.info 'Limited to', limit, 'entities...'
+      Logger.info 'Limited to', limit, 'entities'
 
     projectId = args.projectId ? Projects.getCurrentId()
     unless projectId
@@ -90,7 +90,6 @@ EntityImporter =
       modelDfs.push(layerPromise)
     else
       runner = new TaskRunner()
-      insertedCount = 0
       # A map of type names to deferred promises for creating them. Used to prevent a race condition
       # if we try to create the types with two entities. In this case, the second request should use
       # the existing type promise.
@@ -115,45 +114,11 @@ EntityImporter =
       # A map of parent IDs to a map of children names to their IDs.
       childrenNameMap = {}
 
-      getOrCreateTypologyByName = (name) =>
-        typePromise = typePromiseMap[name]
-        return typePromise if typePromise
-        Logger.debug('Creating type', name)
-        typeDf = Q.defer()
-        typePromiseMap[name] = typeDf.promise
-        type = Typologies.findByName(name, projectId)
-        if type
-          typeDf.resolve(type._id)
-        else
-          fillColor = Typologies.getNextAvailableColor(projectId, {exclude: usedColors})
-          usedColors.push(fillColor)
-          typologyDoc =
-            name: name
-            project: projectId
-          SchemaUtils.setParameterValue(typologyDoc, 'style.fill_color', fillColor)
-          typologyDoc = @_mapTypology(typologyDoc) ? typologyDoc
-          Typologies.insert typologyDoc, (err, typeId) ->
-            if err
-              typeDf.reject(err)
-            else
-              typeDf.resolve(typeId)
-        typeDf.promise
-
       Logger.info('Inserting ' + c3mls.length + ' c3mls...')
 
-      insertedCount = 0
-      incrementC3mlCount = ->
-        insertedCount++
-        if insertedCount % 100 == 0 || insertedCount == c3mls.length
-          Logger.debug('Inserted ' + insertedCount + '/' + c3mls.length + ' entities')
-
-      geometryCount = 0
-      incrementGeometryCount = ->
-        geometryCount++
-        if geometryCount % 100 == 0 || geometryCount == c3mls.length
-          Logger.debug('Parsed ' + geometryCount + '/' + c3mls.length + ' geometries')
-
       _.each c3mls, (c3ml, i) =>
+        if args.forEachC3ml
+          c3ml = c3mls[i] = args.forEachC3ml.call(EntityImporter, c3ml, i) ? c3ml
         c3mlId = c3ml.id
         c3mlMap[c3mlId] = c3ml
         # TODO(aramk) Use the ID given by ACS instead of attempting to name it here.
@@ -179,6 +144,11 @@ EntityImporter =
       _.each c3mls, (c3ml) ->
         id = c3ml.id
         unless sortMap[id] then sortedIds.push(id)
+
+      counterLog = new CounterLog
+        label: 'Importing entities'
+        total: sortedIds.length
+        bufferSize: 100
 
       runner.run()
       geometryPromises = Q.all(_.values(geomDfMap))
@@ -230,6 +200,7 @@ EntityImporter =
                   inputs: inputs
                   converter: converter
                   childrenNameMap: childrenNameMap
+                  counterLog: counterLog
                 }, args)
 
                 parentId = c3ml.parentId
@@ -237,12 +208,16 @@ EntityImporter =
                   missingParentsIdMap[parentId] = true
 
                 createEntity = => @_createEntityFromAsset.call(@, createEntityArgs)
-                modelDf.promise.then(incrementC3mlCount)
 
                 if typeName
-                  getOrCreateTypologyByName(typeName).then Meteor.bindEnvironment (typeId) ->
+                  typeArgs =
+                    typePromiseMap: typePromiseMap
+                    projectId: projectId
+                    usedColors: usedColors
+                  typeSuccess = Meteor.bindEnvironment (typeId) ->
                     createEntityArgs.typeId = typeId
                     createEntity()
+                  @getOrCreateTypologyByName(typeName, typeArgs).then(typeSuccess, createEntity)
                 else
                   createEntity()
               
@@ -252,10 +227,17 @@ EntityImporter =
 
     modelsPromise = Q.all(modelDfs)
     modelsPromise.fail(df.reject)
-    modelsPromise.then Meteor.bindEnvironment ->
+    modelsPromise.then Meteor.bindEnvironment (models) ->
+      modelMap = {}
+      # modelIds also includes null values for entities which were skipped and not inserted.
+      models = _.filter models, (model) -> model?
+      importCount = 0
+      _.each models, (model) ->
+        modelMap[model._id] = model
+        importCount++
+
       requirejs ['atlas/model/GeoPoint'], Meteor.bindEnvironment (GeoPoint) ->
-        importCount = modelDfs.length
-        resolve = -> df.resolve(importCount)
+        resolve = -> df.resolve(modelMap)
         Logger.info 'Imported ' + importCount + ' entities'
         missingParentIds = _.keys missingParentsIdMap
         if missingParentIds.length > 0
@@ -296,7 +278,9 @@ EntityImporter =
     else if type == 'feature'
       @_geometryFromC3mlFeature(c3ml, geomDf)
     else
-      Logger.warn('Skipping unhandled c3ml', c3ml)
+      msg = 'Skipping unhandled c3ml'
+      Logger.warn(msg, c3ml)
+      geomDf.reject(msg)
     geomDf.promise
 
   _geometryFromC3mlMesh: (c3ml, geomDf) ->
@@ -424,6 +408,11 @@ EntityImporter =
             border_color: border_color
           inputs: inputs
       model = @_mapEntity(model, args) ? model
+      if args.forEachEntity
+        model = args.forEachEntity.call(EntityImporter, {entity: model, c3ml: c3ml}) ? model
+        if model == false
+          return modelDf.resolve(null)
+
       callback = (err, insertId) ->
         if err
           Logger.error('Failed to insert entity', err)
@@ -432,14 +421,49 @@ EntityImporter =
             if entityStr.length > CONSOLE_LOG_SIZE_LIMIT && Meteor.isServer
               FileLogger.log(entityStr)
             else
-              Logger.debug('Failed entity', entityStr)
+              Logger.debug('Failed entity insert', entityStr.slice(0, 100) + '...')
           catch e
             Logger.error('Failed to log entity insert failure', e)
           modelDf.reject(err)
         else
-          modelDf.resolve(insertId)
+          model._id = insertId
+          modelDf.resolve(model)
+      
       Entities.insert model, callback
+      args.counterLog.increment()
+    
     modelDf.promise
+
+  getOrCreateTypologyByName: (name, args) ->
+    typePromiseMap = args.typePromiseMap ? {}
+    typePromise = typePromiseMap[name]
+    return typePromise if typePromise
+    Logger.debug('Creating type', name)
+    typeDf = Q.defer()
+    typePromiseMap[name] = typeDf.promise
+
+    projectId = args.projectId
+    unless projectId then return Q.reject('No projectId provided')
+
+    usedColors = args.usedColors ? []
+    
+    type = Typologies.findByName(name, projectId)
+    if type
+      typeDf.resolve(type._id)
+    else
+      fillColor = Typologies.getNextAvailableColor(projectId, {exclude: usedColors})
+      usedColors.push(fillColor)
+      typologyDoc =
+        name: name
+        project: projectId
+      SchemaUtils.setParameterValue(typologyDoc, 'style.fill_color', fillColor)
+      typologyDoc = @_mapTypology(typologyDoc) ? typologyDoc
+      Typologies.insert typologyDoc, (err, typeId) ->
+        if err
+          typeDf.reject(err)
+        else
+          typeDf.resolve(typeId)
+    typeDf.promise
 
   _mapEntity: (doc) -> doc
   _mapTypology: (doc) -> doc
@@ -473,26 +497,32 @@ if Meteor.isServer
       importId = args.importId
       df = null
       if importId?
+        Logger.info('Importing asset for import ID', importId)
         if importRequestMap[importId]
-          throw new Meteor.Error(500, 'Import request with ID ' + importId + ' already exists')
+          throw new Meteor.Error 500, "Import request with ID #{importId} already exists"
         df = importRequestMap[importId] = Q.defer()
         # Removed to prevent memory leaks.
         df.promise.fin -> delete importRequestMap[importId]
-        Logger.info('Import request started', importId)
+        Logger.info 'Import request started', importId
       Promises.runSync ->
-        promise = EntityImporter.fromAsset(args)
-        promise.then(df.resolve, df.reject)
-        # Cancelling the import should return the import method.
-        df.promise
+        promise = EntityImporter.fromAsset(args).then (modelMap) ->
+          # Return just a count of the number of imported models.
+          _.size(modelMap)
+        if df?
+          df.resolve(promise)
+          # Cancelling the import should return the import method.
+          df.promise
+        else
+          promise
     
     'entities/from/asset/cancel': (args) ->
       importId = args.importId
-      Logger.info('Cancelling import request...', importId)
+      Logger.info 'Cancelling import request...', importId
       @unblock()
       df = importRequestMap[importId]
       if df
         df.reject('Import cancelled')
-        Logger.info('Import request cancelled', importId)
+        Logger.info 'Import request cancelled', importId
       else
-        Logger.warn('Import request cannot be cancelled', importId)
+        Logger.warn 'No import request exists with the ID', importId
  
