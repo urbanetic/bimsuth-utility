@@ -110,17 +110,21 @@ ProjectUtils =
         Logger.error('Project creation from JSON failed', err)
         df.reject(err)
       updatesPromise.then Meteor.bindEnvironment ->
+        fin = ->
+          Logger.info('Project creation from JSON succeeded')
+          df.resolve(idMaps)
+        enabledParamId = "#{ParamUtils.prefix}.access.enabled"
+        unless Projects.simpleSchema().schema(enabledParamId)
+          return fin()
         Logger.info('Enabling projects...')
         projectIds = _.values idMaps[Collections.getName(Projects)]
         modifier = {$set: {}}
-        modifier.$set["#{ParamUtils.prefix}.access.enabled"] = true
+        modifier.$set[enabledParamId] = true
         _.each projectIds, (projectId) -> runner.add ->
           projectDf = Q.defer()
           Projects.update projectId, modifier, Promises.toCallback(projectDf)
           projectDf.promise
-        runner.run().fin ->
-          Logger.info('Project creation from JSON succeeded')
-          df.resolve(idMaps)
+        runner.run().fin(fin)
     df.promise
 
   # @params {String} name
