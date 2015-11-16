@@ -40,7 +40,8 @@ Package.onUse(function (api) {
   ], 'client');
   api.export([
     'FileLogger',
-    'Request'
+    'Request',
+    'S3Utils'
   ], 'server');
   api.export([
     'CounterLog',
@@ -48,15 +49,15 @@ Package.onUse(function (api) {
     'EntityUtils',
     'ItemBuffer',
     'TaskRunner',
-    'ProjectUtils',
-    'S3Utils'
+    'ProjectUtils'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
     'src/FileLogger.coffee',
-    'src/Request.coffee'
+    'src/Request.coffee',
+    'src/S3Utils.coffee'
   ], 'server');
   api.addFiles([
     'src/AccountsUtil.coffee',
@@ -65,7 +66,6 @@ Package.onUse(function (api) {
     'src/EntityUtils.coffee',
     'src/ItemBuffer.coffee',
     'src/TaskRunner.coffee',
-    'src/ProjectUtils.coffee',
-    'src/S3Utils.coffee'
+    'src/ProjectUtils.coffee'
   ], ['client', 'server']);
 });

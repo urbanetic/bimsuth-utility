@@ -1,5 +1,4 @@
 AWS = Package['peerlibrary:aws-sdk'].AWS
-console.log('AWS' , AWS)
 return unless AWS?
 
 env = process.env
