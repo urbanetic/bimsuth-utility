@@ -1,4 +1,4 @@
-AWS = Package['peerlibrary:aws-sdk'].AWS
+AWS = Package['peerlibrary:aws-sdk']?.AWS
 return unless AWS?
 
 env = process.env
@@ -21,9 +21,9 @@ S3Utils =
   # A cache of the downloaded files.
   _cache: {}
   
-  # Returns a promised buffer containing the data in the given bucket and key.
+  # Promises a buffer containing the data in the given bucket and key.
   #  * `bucket` - The name of the S3 bucket.
-  #  * `key` - The name of the file.
+  #  * `key` - The name of the key.
   #  * `options.cache` - Whether to use the cache for the request. Defaults to true. If false,
   #                      the result is still cached for next use.
   download: (bucket, key, options) ->
@@ -42,4 +42,12 @@ S3Utils =
           df.resolve(result.Body)
     catch err
       df.reject(err)
+    df.promise
+
+  # Promises a boolean for whether the given key exists in the given bucket.
+  exists: (bucket, key) ->
+    df = Q.defer()
+    s3.headObject {Bucket: bucket, Key: key}, (err, result) ->
+      exists = !(err and err.code == 'NotFound')
+      df.resolve(exists)
     df.promise
