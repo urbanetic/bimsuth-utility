@@ -23,6 +23,7 @@ Package.onUse(function (api) {
     'urbanetic:accounts-ui@0.2.2',
     'urbanetic:bismuth-schema-utility@0.2.0'
   ], ['client', 'server']);
+  // TODO(aramk) Weak dependency on aramk:file-upload@0.4.0, but causes cyclic dependencies.
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
     'urbanetic:atlas-util@0.3.0',
@@ -39,7 +40,6 @@ Package.onUse(function (api) {
     'Csv'
   ], 'client');
   api.export([
-    'FileLogger',
     'Request',
     'S3Utils'
   ], 'server');
@@ -55,7 +55,6 @@ Package.onUse(function (api) {
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
-    'src/FileLogger.coffee',
     'src/Request.coffee',
     'src/S3Utils.coffee'
   ], 'server');
