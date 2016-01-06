@@ -1,3 +1,5 @@
+return unless Projects? and CollectionUtils?
+
 # Constructs a map of collection name to collection.
 
 reNumberAfterName = /(\d+)(\s*)$/
