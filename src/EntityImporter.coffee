@@ -271,7 +271,7 @@ EntityImporter =
     type = AtlasConverter.sanitizeType(c3ml.type)
     if type == 'mesh'
       @_geometryFromC3mlMesh(c3ml, geomDf)
-    else if type == 'polygon'
+    else if type == 'polygon' or type == 'line'
       @_geometryFromC3mlPolygon(c3ml, geomDf)
     else if type == 'collection'
       @_geometryFromC3mlCollection(c3ml, geomDf)
@@ -312,7 +312,7 @@ EntityImporter =
 
   _geometryFromC3mlPolygon: (c3ml, geomDf) ->
     # Necessary for WKT to recognize the geometry as a polygon.
-    c3ml.type = 'polygon'
+    c3ml.type = AtlasConverter.sanitizeType(c3ml.type)
     wktPromise = WKT.fromC3ml(c3ml)
     wktPromise.then (wkt) ->
       geomArgs = null

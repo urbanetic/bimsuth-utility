@@ -147,43 +147,42 @@ EntityUtils =
       # themselves to the parent.
       df.resolve(AtlasManager.createCollection(id, {children: []}))
     else
-      requirejs ['atlas/model/Feature'], Meteor.bindEnvironment (Feature) =>
-        WKT.getWKT Meteor.bindEnvironment (wkt) =>
-          isWKT = wkt.isWKT(geom_2d)
-          Q.all([@_render2dGeometry(id), @_render3dGeometry(id)]).then(
-            Meteor.bindEnvironment (geometries) =>
-              entity2d = geometries[0]
-              entity3d = geometries[1]
-              unless entity2d || entity3d
-                df.resolve(null)
-                return
+      WKT.getWKT Meteor.bindEnvironment (wkt) =>
+        isWKT = wkt.isWKT(geom_2d)
+        Q.all([@_render2dGeometry(id), @_render3dGeometry(id)]).then(
+          Meteor.bindEnvironment (geometries) =>
+            entity2d = geometries[0]
+            entity3d = geometries[1]
+            unless entity2d || entity3d
+              df.resolve(null)
+              return
 
-              # This feature will be used for rendering the 2d geometry as the
-              # footprint/extrusion and the 3d geometry as the mesh.
-              geoEntityDf = Q.defer()
-              if isWKT
-                geoEntityDf.resolve(entity2d)
-              else
-                # If we construct the 2d geometry from a collection of entities rather than
-                # WKT, the geometry is a collection rather than a feature. Create a new
-                # feature to store both 2d and 3d geometries.
-                args = @toGeoEntityArgs(id, {vertices: null})
-                geoEntity = AtlasManager.renderEntity(args)
-                addedGeometry.push(geoEntity)
-                if entity2d
-                  geoEntity.setForm(Feature.DisplayMode.FOOTPRINT, entity2d)
-                  args.height? && entity2d.setHeight(args.height)
-                  args.elevation? && entity2d.setElevation(args.elevation)
-                geoEntityDf.resolve(geoEntity)
-              geoEntityDf.promise.then(
-                Meteor.bindEnvironment (geoEntity) =>
-                  if entity3d
-                    geoEntity.setForm(Feature.DisplayMode.MESH, entity3d)
-                  df.resolve(geoEntity)
-                df.reject
-              )
-            df.reject
-          )
+            # This feature will be used for rendering the 2d geometry as the
+            # footprint/extrusion and the 3d geometry as the mesh.
+            geoEntityDf = Q.defer()
+            if isWKT
+              geoEntityDf.resolve(entity2d)
+            else
+              # If we construct the 2d geometry from a collection of entities rather than
+              # WKT, the geometry is a collection rather than a feature. Create a new
+              # feature to store both 2d and 3d geometries.
+              args = @toGeoEntityArgs(id, {vertices: null})
+              geoEntity = AtlasManager.renderEntity(args)
+              addedGeometry.push(geoEntity)
+              if entity2d
+                geoEntity.setForm(Atlas.Feature.DisplayMode.FOOTPRINT, entity2d)
+                args.height? && entity2d.setHeight(args.height)
+                args.elevation? && entity2d.setElevation(args.elevation)
+              geoEntityDf.resolve(geoEntity)
+            geoEntityDf.promise.then(
+              Meteor.bindEnvironment (geoEntity) =>
+                if entity3d
+                  geoEntity.setForm(Atlas.Feature.DisplayMode.MESH, entity3d)
+                df.resolve(geoEntity)
+              df.reject
+            )
+          df.reject
+        )
     df.promise.then Meteor.bindEnvironment (geoEntity) =>
       return unless geoEntity
       # TODO(aramk) Rendering the parent as a special case with children doesn't affect the
@@ -416,11 +415,21 @@ EntityUtils =
       if child then childIds.push(childId)
     childIds
 
-  getSelectedIds: ->
+  getSelectedIds: (options) ->
     # Use the selected entities, or all entities in the project.
-    entityIds = AtlasManager.getSelectedFeatureIds()
+    entityIds = AtlasManager.getSelectedEntityIds()
     # Filter GeoEntity objects which are not project entities.
-    _.filter entityIds, (id) -> Entities.findOne(id)
+    entityIds = _.filter entityIds, (id) -> Collections.hasDoc(Entities, id)
+    # Simplify the IDs by resolving children of collections and removing them from the results.
+    unless options?.resolveCollections == false
+      entityIdMap = {}
+      _.each entityIds, (id) -> entityIdMap[id] = true
+      _.each entityIds, (id) ->
+        geoEntity = AtlasManager.getEntity(id)
+        _.each geoEntity?.getRecursiveChildren?(), (child) ->
+          delete entityIdMap[AtlasIdMap.getAppId(child.getId())]
+      entityIds = _.keys(entityIdMap)
+    entityIds
 
   _getModel: (id) -> Entities.findOne(id)
 
@@ -598,3 +607,10 @@ if Meteor.isServer
     'entities/to/kmz': (args) ->
       @unblock()
       EntityUtils.convertToKmz(args)
+
+# RequireJS modules
+Atlas = {}
+requirejs [
+  'atlas/model/Feature'
+], (Feature) ->
+  Atlas.Feature = Feature

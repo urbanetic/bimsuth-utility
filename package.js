@@ -17,14 +17,17 @@ Package.onUse(function (api) {
     'coffeescript',
     'underscore',
     'aramk:q@1.0.1_1',
+    'aramk:requirejs@2.1.15_1',
     'reactive-var@1.0.5',
     'urbanetic:accounts-ui@0.2.2',
     'urbanetic:bismuth-schema-utility@0.2.0',
     'urbanetic:utility@1.0.1'
   ], ['client', 'server']);
+  // TODO(aramk) Weak dependency on aramk:file-upload@0.4.0, but causes cyclic dependencies.
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
-    'urbanetic:atlas-util@0.3.0'
+    'urbanetic:atlas-util@0.3.0',
+    'peerlibrary:aws-sdk@2.1.47_1'
   ], ['client', 'server'], {weak: true});
   api.use([
     'jquery',
@@ -37,8 +40,8 @@ Package.onUse(function (api) {
     'Csv'
   ], 'client');
   api.export([
-    'FileLogger',
-    'Request'
+    'Request',
+    'S3Utils'
   ], 'server');
   api.export([
     'CounterLog',
@@ -52,8 +55,8 @@ Package.onUse(function (api) {
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
-    'src/FileLogger.coffee',
-    'src/Request.coffee'
+    'src/Request.coffee',
+    'src/S3Utils.coffee'
   ], 'server');
   api.addFiles([
     'src/AccountsUtil.coffee',

@@ -1,3 +1,5 @@
+return unless Projects? and CollectionUtils?
+
 # Constructs a map of collection name to collection.
 
 reNumberAfterName = /(\d+)(\s*)$/
@@ -65,8 +67,9 @@ ProjectUtils =
             SchemaUtils.setParameterValue(model, 'access.public', false)
             user = AccountsUtil.resolveUser(args.userId)
             if user? then model[AccountsUtil.AUTHOR_FIELD] = user._id
-          # Ensure collection hooks run for the project since there are far fewer docs.
-          method = collection.direct.insert if args.useDirect
+          # Ensure collection hooks run for the project since there are far fewer docs, but hooks
+          # are important (e.g. setting created and modified dates).
+          method = collection.direct.insert if args.useDirect and collection != Projects
           method ?= collection.insert
           method.call collection, model, (err, result) ->
             if err
