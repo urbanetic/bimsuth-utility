@@ -74,6 +74,35 @@ class DocMap
 
   getCollection: -> unless @_options.plain then @_collection
 
+  # Wraps methods on the given collection to use the DocMap as a cache
+  wrapCollection: (collection) ->
+    unless collection then throw new Error('No collection to wrap')
+
+    collection._findOne = collection.findOne
+    collection.findOne = (selector, options) =>
+      usedCache = true
+      findSelector = selector
+      if Types.isString(selector)
+        doc = @get(selector)
+        findSelector = {_id: selector}
+      else if Types.isObjectLiteral(selector) and selector._id?
+        doc = @get(selector._id)
+      else
+        doc = collection._findOne.apply(collection, arguments)
+        usedCache = false
+
+      if Tracker.active and usedCache
+        # Create reactive dependency if necessary but avoid calling fetch() which is slower.
+        cursor = collection.find.call(collection, findSelector, options)
+        if cursor.reactive
+          cursor._depend
+            addedBefore: true
+            removed: true
+            changed: true
+            movedBefore: true
+
+      return doc
+
   reset: -> _.each @_handles, (handle) -> handle.stop()
 
   destroy: ->
