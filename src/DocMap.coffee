@@ -77,31 +77,47 @@ class DocMap
   # Wraps methods on the given collection to use the DocMap as a cache
   wrapCollection: (collection) ->
     unless collection then throw new Error('No collection to wrap')
+    if @_options.freeze then throw new Error('Cannot wrap collection which is frozen - will cause
+        findOne() result to be unexpectedly frozen')
 
     collection._findOne = collection.findOne
     collection.findOne = (selector, options) =>
-      usedCache = true
-      findSelector = selector
-      if Types.isString(selector)
-        doc = @get(selector)
-        findSelector = {_id: selector}
-      else if Types.isObjectLiteral(selector) and selector._id?
-        doc = @get(selector._id)
-      else
-        doc = collection._findOne.apply(collection, arguments)
-        usedCache = false
+      options ?= {}
+      options.collection = collection
+      @findOne(selector, options)
 
-      if Tracker.active and usedCache
-        # Create reactive dependency if necessary but avoid calling fetch() which is slower.
-        cursor = collection.find.call(collection, findSelector, options)
-        if cursor.reactive
-          cursor._depend
-            addedBefore: true
-            removed: true
-            changed: true
-            movedBefore: true
+  findOne: (selector, options) =>
+    usedCache = true
+    findSelector = selector
+    collection = options?.collection ? @getCollection()
 
-      return doc
+    if Types.isString(selector)
+      doc = @get(selector)
+      findSelector = {_id: selector}
+    else if Types.isObjectLiteral(selector) and selector._id?
+      doc = @get(selector._id)
+    else
+      useCache = false
+
+    # If the doc wasn't found in the cache, or an ID wasn't provided, attempt to find in the
+    # collection.
+    # TODO(aramk) This won't actually be used for when plain = true, since there's no collection.
+    if (!doc or !useCache) and collection
+      # Use _findOne() if using wrapCollection.
+      doc = (collection._findOne ? collection.findOne).apply(collection, arguments)
+      useCache = false
+
+    if Tracker.active and usedCache and collection
+      # Create reactive dependency if necessary but avoid calling fetch() which is slower.
+      cursor = collection.find.call(collection, findSelector, options)
+      if cursor.reactive
+        cursor._depend
+          addedBefore: true
+          removed: true
+          changed: true
+          movedBefore: true
+
+    return doc
 
   reset: -> _.each @_handles, (handle) -> handle.stop()
 
