@@ -25,7 +25,7 @@ Package.onUse(function (api) {
   ], ['client', 'server']);
   // TODO(aramk) Weak dependency on aramk:file-upload@0.4.0, but causes cyclic dependencies.
   api.use([
-    'urbanetic:bismuth-schema@0.1.0',
+    'urbanetic:bismuth-schema@0.3.0',
     'urbanetic:atlas-util@0.3.0',
     'peerlibrary:aws-sdk@2.1.47_1'
   ], ['client', 'server'], {weak: true});
