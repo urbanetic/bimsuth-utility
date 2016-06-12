@@ -46,11 +46,8 @@ Package.onUse(function (api) {
   api.export([
     'CounterLog',
     'DocMap',
-    'EntityImporter',
-    'EntityUtils',
     'ItemBuffer',
-    'TaskRunner',
-    'ProjectUtils'
+    'TaskRunner'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -63,10 +60,7 @@ Package.onUse(function (api) {
     'src/AccountsUtil.coffee',
     'src/CounterLog.coffee',
     'src/DocMap.coffee',
-    'src/EntityImporter.coffee',
-    'src/EntityUtils.coffee',
     'src/ItemBuffer.coffee',
-    'src/TaskRunner.coffee',
-    'src/ProjectUtils.coffee'
+    'src/TaskRunner.coffee'
   ], ['client', 'server']);
 });
