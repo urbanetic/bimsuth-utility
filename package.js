@@ -21,7 +21,7 @@ Package.onUse(function (api) {
     'reactive-var@1.0.5',
     'urbanetic:accounts-ui@0.2.2',
     'urbanetic:bismuth-schema-utility@0.2.0',
-    'utility:utility@1.2.0'
+    'urbanetic:utility@1.2.0'
   ], ['client', 'server']);
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
