@@ -12,16 +12,16 @@ Npm.depends({
 });
 
 Package.onUse(function (api) {
-  api.versionsFrom('METEOR@0.9.0');
+  api.versionsFrom('METEOR@1.2.0.1');
   api.use([
     'coffeescript',
     'underscore',
     'aramk:q@1.0.1_1',
     'aramk:requirejs@2.1.15_1',
-    'aramk:utility@0.8.6',
     'reactive-var@1.0.5',
     'urbanetic:accounts-ui@0.2.2',
-    'urbanetic:bismuth-schema-utility@0.2.0'
+    'urbanetic:bismuth-schema-utility@0.2.0',
+    'utility:utility@1.2.0'
   ], ['client', 'server']);
   api.use([
     'urbanetic:bismuth-schema@0.1.0',
