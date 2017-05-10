@@ -10,8 +10,7 @@ class DocMap
       # to be cloned, but is not reactive and selectors cannot be used on the underlying collection.
       plain: false
     }, options)
-    @_collection = if @_options.plain then {} else Collections.createTemporary()
-    @_handles = []
+    @reset()
 
   # Adds the given documents to the map.
   #   * `arg` - A cursor, collection, array or document.
@@ -48,7 +47,10 @@ class DocMap
 
   _maybeFreeze: (doc) -> if @_options.freeze then Object.freeze(doc) else doc
 
-  get: (id) -> if @_options.plain then @_collection[id] else @_collection._collection._docs.get(id)
+  get: (id) ->
+    # TODO
+    return {}
+    if @_options.plain then @_collection[id] else @_collection._collection._docs.get(id)
 
   getAll: -> _.values @_getMap()
 
@@ -72,7 +74,9 @@ class DocMap
 
   size: -> if @_options.plain then _.size(@_collection) else @_collection._collection._docs.size()
 
-  getCollection: -> unless @_options.plain then @_collection
+  getCollection: ->
+    return {}
+    unless @_options.plain then @_collection
 
   # Wraps methods on the given collection to use the DocMap as a cache
   wrapCollection: (collection) ->
@@ -87,6 +91,9 @@ class DocMap
       @findOne(selector, options)
 
   findOne: (selector, options) =>
+    # TODO
+    return {}
+
     usedCache = true
     findSelector = selector
     collection = options?.collection ? @getCollection()
@@ -119,7 +126,10 @@ class DocMap
 
     return doc
 
-  reset: -> _.each @_handles, (handle) -> handle.stop()
+  reset: ->
+    @_collection = if @_options.plain then {} else Collections.createTemporary()
+    _.each @_handles, (handle) -> handle.stop()
+    @_handles = []
 
   destroy: ->
     # TODO(aramk) Add any destructive logic here.
