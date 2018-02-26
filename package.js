@@ -1,7 +1,7 @@
 // Meteor package definition.
 Package.describe({
   name: 'urbanetic:bismuth-utility',
-  version: '0.3.0',
+  version: '1.0.0',
   summary: 'A set of utilities for working with GIS apps.',
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });
@@ -12,20 +12,20 @@ Npm.depends({
 });
 
 Package.onUse(function (api) {
-  api.versionsFrom('METEOR@1.2.0.1');
+  api.versionsFrom('METEOR@1.6.1');
   api.use([
     'coffeescript',
     'underscore',
     'aramk:q@1.0.1_1',
     'aramk:requirejs@2.1.15_1',
     'reactive-var@1.0.5',
-    'urbanetic:accounts-ui@0.2.2',
-    'urbanetic:bismuth-schema-utility@0.3.0',
-    'urbanetic:utility@1.2.0'
+    'urbanetic:accounts-ui@1.0.0',
+    'urbanetic:bismuth-schema-utility@1.0.0',
+    'urbanetic:utility@2.0.0'
   ], ['client', 'server']);
-  // TODO(aramk) Weak dependency on aramk:file-upload@0.4.0, but causes cyclic dependencies.
+  // TODO(aramk) Weak dependency on aramk:file-upload@1.0.0, but causes cyclic dependencies.
   api.use([
-    'urbanetic:bismuth-schema@0.3.0',
+    'urbanetic:bismuth-schema@1.0.0',
     'urbanetic:atlas-util@0.3.0',
     'peerlibrary:aws-sdk@2.1.47_1'
   ], ['client', 'server'], {weak: true});
