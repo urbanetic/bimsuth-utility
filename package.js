@@ -14,7 +14,7 @@ Npm.depends({
 Package.onUse(function (api) {
   api.versionsFrom('METEOR@1.6.1');
   api.use([
-    'coffeescript',
+    'coffeescript@2.2.1_1',
     'underscore',
     'aramk:q@1.0.1_1',
     'aramk:requirejs@2.1.15_1',
@@ -32,7 +32,7 @@ Package.onUse(function (api) {
   api.use([
     'jquery',
     'less',
-    'templating'
+    'templating@1.3.2'
   ], 'client');
   // TODO(aramk) Perhaps expose the charts through the Vega object only to avoid cluttering the
   // namespace.
