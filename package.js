@@ -1,7 +1,7 @@
 // Meteor package definition.
 Package.describe({
   name: 'urbanetic:bismuth-utility',
-  version: '1.0.1',
+  version: '2.0.0',
   summary: 'A set of utilities for working with GIS apps.',
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });
@@ -26,7 +26,7 @@ Package.onUse(function (api) {
   // TODO(aramk) Weak dependency on aramk:file-upload@1.0.0, but causes cyclic dependencies.
   api.use([
     'urbanetic:bismuth-schema@1.0.0',
-    'urbanetic:atlas-util@0.3.0',
+    'urbanetic:atlas-util@1.0.0',
     'peerlibrary:aws-sdk@2.1.47_1'
   ], ['client', 'server'], {weak: true});
   api.use([
@@ -46,11 +46,8 @@ Package.onUse(function (api) {
   api.export([
     'CounterLog',
     'DocMap',
-    'EntityImporter',
-    'EntityUtils',
     'ItemBuffer',
     'TaskRunner',
-    'ProjectUtils'
   ], ['client', 'server']);
   api.addFiles([
     'src/Csv.coffee'
@@ -63,10 +60,7 @@ Package.onUse(function (api) {
     'src/AccountsUtil.coffee',
     'src/CounterLog.coffee',
     'src/DocMap.coffee',
-    'src/EntityImporter.coffee',
-    'src/EntityUtils.coffee',
     'src/ItemBuffer.coffee',
     'src/TaskRunner.coffee',
-    'src/ProjectUtils.coffee'
   ], ['client', 'server']);
 });
