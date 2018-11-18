@@ -8,7 +8,8 @@ Package.describe({
 
 Npm.depends({
   'request': '2.37.0',
-  'concat-stream': '1.4.7'
+  'concat-stream': '1.4.7',
+  'node-geocoder': '3.22.0'
 });
 
 Package.onUse(function (api) {
@@ -41,7 +42,8 @@ Package.onUse(function (api) {
   ], 'client');
   api.export([
     'Request',
-    'S3Utils'
+    'S3Utils',
+    'Geocoder',
   ], 'server');
   api.export([
     'CounterLog',
@@ -53,14 +55,15 @@ Package.onUse(function (api) {
     'src/Csv.coffee'
   ], 'client');
   api.addFiles([
-    'src/Request.coffee',
-    'src/S3Utils.coffee'
-  ], 'server');
-  api.addFiles([
     'src/AccountsUtil.coffee',
     'src/CounterLog.coffee',
     'src/DocMap.coffee',
     'src/ItemBuffer.coffee',
     'src/TaskRunner.coffee',
   ], ['client', 'server']);
+  api.addFiles([
+    'src/Request.coffee',
+    'src/S3Utils.coffee',
+    'src/Geocoder.coffee'
+  ], 'server');
 });
