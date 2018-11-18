@@ -8,7 +8,6 @@ options =
   appCode: hereAppCode
 
 geocoder = NodeGeocoder(options)
-console.log('>>> TaskRunner', TaskRunner)
 
 Geocoder =
 
