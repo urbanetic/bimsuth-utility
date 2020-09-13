@@ -13,7 +13,7 @@ blaze@2.1.2
 blaze-tools@1.0.3
 callback-hook@1.0.3
 check@1.0.5
-coffeescript@1.0.6
+coffeescript@2.2.1_1
 ddp@1.1.0
 deps@1.0.7
 digilord:roles@1.2.12
@@ -51,7 +51,7 @@ stevezhu:lodash@0.2.0
 templating@1.1.1
 tracker@1.0.7
 underscore@1.0.3
-urbanetic:accounts-ui@0.2.2
-urbanetic:bismuth-schema-utility@0.2.0
-urbanetic:bismuth-utility@0.2.1
+urbanetic:accounts-ui@1.0.0
+urbanetic:bismuth-schema-utility@1.0.0
+urbanetic:bismuth-utility@1.0.0
 url@1.0.4
