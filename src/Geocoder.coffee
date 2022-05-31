@@ -2,6 +2,10 @@ NodeGeocoder = Npm.require('node-geocoder')
 
 {hereAppId, hereAppCode} = Meteor.settings
 
+unless hereAppId? and hereAppCode?
+  Logger.warn('Geocoder needs hereAppId and hereAppCode')
+  return
+
 options =
   provider: 'here'
   appId: hereAppId
