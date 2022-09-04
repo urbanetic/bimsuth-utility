@@ -1,7 +1,7 @@
 // Meteor package definition.
 Package.describe({
   name: 'urbanetic:bismuth-utility',
-  version: '2.0.1',
+  version: '3.0.0',
   summary: 'A set of utilities for working with GIS apps.',
   git: 'https://github.com/urbanetic/bismuth-reports.git'
 });
@@ -20,9 +20,9 @@ Package.onUse(function (api) {
     'aramk:q@1.0.1_1',
     'aramk:requirejs@2.1.15_1',
     'reactive-var@1.0.5',
-    'urbanetic:accounts-ui@1.1.1',
-    'urbanetic:bismuth-schema-utility@1.0.0',
-    'urbanetic:utility@2.0.0'
+    'urbanetic:accounts-ui@2.0.0',
+    'urbanetic:bismuth-schema-utility@2.0.0',
+    'urbanetic:utility@3.0.0'
   ], ['client', 'server']);
   // TODO(aramk) Weak dependency on aramk:file-upload@1.0.0, but causes cyclic dependencies.
   api.use([
@@ -32,7 +32,7 @@ Package.onUse(function (api) {
   ], ['client', 'server'], {weak: true});
   api.use([
     'jquery',
-    'less',
+    'less@4.0.0',
     'templating@1.3.2'
   ], 'client');
   // TODO(aramk) Perhaps expose the charts through the Vega object only to avoid cluttering the
